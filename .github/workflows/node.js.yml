@@ -36,7 +36,7 @@ jobs:
       - name: Check if pm2 process exists
         id: pm2_check
         run: |
-          if pm2 list | grep -q "ytso"; then
+          if pm2 describe ytso > /dev/null; then
             echo "exists=true" >> $GITHUB_ENV
           else
             echo "exists=false" >> $GITHUB_ENV
