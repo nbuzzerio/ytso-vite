@@ -35,11 +35,16 @@ jobs:
       # Check if pm2 process with name 'ytso' exists
       - name: Check if pm2 process exists
         id: pm2_check
-        run: pm2 list | grep -q "ytso" || echo "::set-output name=exists::false"
+        run: |
+          if pm2 list | grep -q "ytso"; then
+            echo "exists=true" >> $GITHUB_ENV
+          else
+            echo "exists=false" >> $GITHUB_ENV
+          fi
 
       # Stop pm2 process if it exist
       - name: Stop pm2 process
-        if: steps.pm2_check.outputs.exists == 'true'
+        if: env.exists == 'true'
         run: pm2 stop ytso
 
       # Install npm packages
@@ -52,12 +57,12 @@ jobs:
 
       # Start pm2 process if it doesn't exist
       - name: Start pm2 process
-        if: steps.pm2_check.outputs.exists == 'false'
+        if: env.exists == 'false'
         run: pm2 start npm --name ytso -- start
 
       # Save pm2 process if it did not exist for system reboot
       - name: Save pm2 process
-        if: steps.pm2_check.outputs.exists == 'false'
+        if: env.exists == 'false'
         run: pm2 save
 
       # Restart pm2 process
