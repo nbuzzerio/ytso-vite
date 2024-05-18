@@ -1,0 +1,65 @@
+# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
+
+name: YouTube Subscription Organizer CI
+
+on:
+  push:
+    branches: ["master"]
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    strategy:
+      matrix:
+        node-version: [18.x]
+        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: "npm"
+
+      - name: Set env variables in .env
+        run: |
+          echo "jwtPrivateKey=${{ secrets.jwtPrivateKey }}" >> .env 
+          echo "db=${{ secrets.db }}" >> .env
+          echo "testdb=${{ secrets.testdb }}" >> .env
+          echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> .env
+          echo "PORT=${{ secrets.PORT }}" >> .env
+
+      # Check if pm2 process with name 'ytso' exists
+      - name: Check if pm2 process exists
+        id: pm2_check
+        run: pm2 list | grep -q "ytso" || echo "::set-output name=exists::false"
+
+      # Stop pm2 process if it exist
+      - name: Stop pm2 process
+        if: steps.pm2_check.outputs.exists == 'true'
+        run: pm2 stop ytso
+
+      # Install npm packages
+      - name: Install npm packages
+        run: npm i
+
+      # Run the build
+      - name: Build for production
+        run: npm run build --if-present
+
+      # Start pm2 process if it doesn't exist
+      - name: Start pm2 process
+        if: steps.pm2_check.outputs.exists == 'false'
+        run: pm2 start npm --name ytso -- start
+
+      # Save pm2 process if it did not exist for system reboot
+      - name: Save pm2 process
+        if: steps.pm2_check.outputs.exists == 'false'
+        run: pm2 save
+
+      # Restart pm2 process
+      - name: Restart pm2 process
+        run: pm2 restart ytso

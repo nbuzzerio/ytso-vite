@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.overflow-ellipsis {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.screenshots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  max-width: 100%;
+
+  @media (max-width: 767px) {
+    grid-template-columns: repeat(1, 1fr);
+  }
+}
+
+@keyframes oscillateOpacity {
+  0%,
+  100% {
+    opacity: 1; // 100% opacity
+  }
+  50% {
+    opacity: 0.75; // 75% opacity
+  }
+}
+
+.oscillate {
+  animation: oscillateOpacity 2s ease-in-out infinite;
+}
