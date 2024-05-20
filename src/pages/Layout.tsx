@@ -6,7 +6,7 @@ const Layout = () => {
   const theme = useTheme();
   return (
     <div
-      className={`min-h-screen transition-colors duration-300 sm:px-5 ${theme ? "bg-dark text-light" : "bg-light text-dark"}`}
+      className={`min-h-screen transition-colors duration-300 ${theme ? "bg-dark text-light" : "bg-light text-dark"}`}
     >
       <NavBar />
       <Outlet />

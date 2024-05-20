@@ -11,7 +11,7 @@ const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [
       { index: true, element: <Homepage /> },
-      { path: "ytso/:slug", element: <DetailPage /> },
+      { path: "/ytso/:slug", element: <DetailPage /> },
     ],
   },
 ]);
