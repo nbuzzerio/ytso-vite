@@ -9,7 +9,9 @@ const Layout = () => {
       className={`min-h-screen transition-colors duration-300 ${theme ? "bg-dark text-light" : "bg-light text-dark"}`}
     >
       <NavBar />
-      <Outlet />
+      <main className="w-full pt-20">
+        <Outlet />
+      </main>
     </div>
   );
 };
