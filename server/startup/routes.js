@@ -14,11 +14,11 @@ export default function (server) {
     return next();
   });
 
-  server.use("/ytso/api/auth", auth);
-  server.use("/ytso/api/users", users);
-  server.use("/ytso/api/groups", groups);
-  server.use("/ytso/api/search", search);
-  server.use("/ytso/api/subs", subs);
-  server.use("/ytso/api/categories", categories);
+  server.use("/api/auth", auth);
+  server.use("/api/users", users);
+  server.use("/api/groups", groups);
+  server.use("/api/search", search);
+  server.use("/api/subs", subs);
+  server.use("/api/categories", categories);
   server.use(error);
 }
