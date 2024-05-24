@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useAuth, useUpdateAuth } from "./AuthContext/AuthContext";
 import logo from "../assets/favicon.ico";
-
 import jwt from "jsonwebtoken";
 
 const NavBar = () => {
@@ -13,7 +12,7 @@ const NavBar = () => {
   const setAuth = useUpdateAuth();
   const location = useLocation();
 
-  const checkAuthToken = async () => {
+  const checkAuthToken = () => {
     const cookies = document.cookie.split(";");
     cookies.forEach((cookie) => {
       if (cookie.includes("x-auth-token=")) {
@@ -65,7 +64,7 @@ const NavBar = () => {
           className={`wrapper max-w-bg absolute z-10 mx-auto flex h-[80px] w-full items-center justify-between bg-red-600 lg:h-[140px]`}
         >
           <div className="logo-wrapper nav-item z-10 hidden px-10 lg:flex">
-            <Link to="/">
+            <Link to="/ytso">
               <img
                 className="h-32 cursor-pointer px-2"
                 src={logo}
@@ -76,7 +75,7 @@ const NavBar = () => {
 
           <div className="home-wrapper flex justify-center px-5 sm:px-10 lg:absolute lg:w-full">
             <Link
-              to="/"
+              to="/ytso"
               title="home"
               className="text-logo whitespace-nowrap text-4xl font-extrabold uppercase text-white md:text-6xl lg:text-7xl"
             >
@@ -89,13 +88,13 @@ const NavBar = () => {
               {!auth && location.pathname !== "/login" && (
                 <>
                   <Link
-                    to="/login"
+                    to="/ytso/login"
                     className="sign-in mx-2 hidden bg-white px-3 shadow-inner md:flex"
                   >
                     Sign In
                   </Link>
                   <Link
-                    to="/login?signup=true"
+                    to="/ytso/login?signup=true"
                     className="sign-in mx-2 hidden bg-white px-3 shadow-inner md:flex"
                   >
                     Sign Up

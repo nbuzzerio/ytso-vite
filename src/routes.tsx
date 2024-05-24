@@ -3,6 +3,7 @@ import Layout from "./pages/Layout";
 import Homepage from "./pages/Homepage";
 import DetailPage from "./pages/DetailPage";
 import ErrorPage from "./pages/ErrorPage";
+import Login from "./pages/Login";
 
 const router = createBrowserRouter([
   {
@@ -11,6 +12,7 @@ const router = createBrowserRouter([
     errorElement: <ErrorPage />,
     children: [
       { index: true, element: <Homepage /> },
+      { path: "/ytso/login", element: <Login /> },
       { path: "/ytso/:slug", element: <DetailPage /> },
     ],
   },

@@ -19,6 +19,7 @@
     "*.{js,css,md,json}": "prettier --write"
   },
   "dependencies": {
+    "@hookform/resolvers": "^3.4.2",
     "@popperjs/core": "^2.11.8",
     "@tanstack/react-query": "^5.24.1",
     "bcrypt": "^5.1.1",
@@ -36,10 +37,12 @@
     "mongoose": "^8.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hook-form": "^7.51.5",
     "react-icons": "^5.0.1",
     "react-router-dom": "^6.23.1",
     "winston": "^3.13.0",
     "winston-mongodb": "^5.1.1",
+    "yup": "^1.4.0",
     "zustand": "^4.5.1"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from "react";
 
-const AuthContext = createContext<string>("");
+const AuthContext = createContext<string | null>(null);
 const AuthUpdateContext = createContext<(token: string) => void>(() => {});
 
 export function useAuth() {
@@ -12,16 +12,11 @@ export function useUpdateAuth() {
 }
 
 function AuthProvider({ children }: { children: React.ReactNode }) {
-  const token: string = "";
-  const [auth, setAuth] = useState(token);
-
-  function handleAuth(token: string) {
-    setAuth(token);
-  }
+  const [auth, setAuth] = useState<string | null>(null);
 
   return (
     <AuthContext.Provider value={auth}>
-      <AuthUpdateContext.Provider value={handleAuth}>
+      <AuthUpdateContext.Provider value={setAuth}>
         {children}
       </AuthUpdateContext.Provider>
     </AuthContext.Provider>
