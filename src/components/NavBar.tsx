@@ -85,7 +85,7 @@ const NavBar = () => {
 
           <div className="right-header-wrapper nav-item z-10 flex items-center px-10">
             <div className="login-wrapper flex">
-              {!auth && location.pathname !== "/login" && (
+              {!auth && location.pathname !== "/ytso/login" && (
                 <>
                   <Link
                     to="/ytso/login"
@@ -110,10 +110,10 @@ const NavBar = () => {
                       </div>
                     )}
                     <button
-                      className="sign-in mx-2 flex bg-white px-3 shadow-inner"
+                      className="sign-in xs:px-3 mx-2 flex bg-white px-1 shadow-inner"
                       onClick={handleLogOut}
                     >
-                      Log Out
+                      Log&nbsp;Out
                     </button>
                   </div>
                 </>
@@ -149,11 +149,11 @@ const NavBar = () => {
                 <li className="xs:text-2xl pb-10 text-xl uppercase tracking-[.2rem] text-black lg:text-3xl">
                   Menu
                 </li>
-                {!auth && location.pathname !== "/login" && (
+                {!auth && location.pathname !== "/ytso/login" && (
                   <>
                     <li onClick={handleDropDown}>
                       <Link
-                        to="/login"
+                        to="/ytso/login"
                         className="sign-in mx-2 w-20 bg-white px-3 shadow-inner md:hidden"
                       >
                         Sign In
@@ -161,7 +161,7 @@ const NavBar = () => {
                     </li>
                     <li onClick={handleDropDown}>
                       <Link
-                        to="/login?signup=true"
+                        to="/ytso/login?signup=true"
                         className="sign-in mx-2 bg-white px-3 shadow-inner md:hidden"
                       >
                         Sign Up

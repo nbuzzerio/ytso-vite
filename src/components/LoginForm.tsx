@@ -36,7 +36,7 @@ const LoginForm = () => {
     };
     if (signUp) user.name = data.name;
 
-    fetch(`${window.location.origin}/api/${signUp ? "users" : "auth"}`, {
+    fetch(`${window.location.origin}/ytso/api/${signUp ? "users" : "auth"}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
