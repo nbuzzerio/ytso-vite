@@ -105,12 +105,12 @@ const NavBar = () => {
                 <>
                   <div className="loggedIn-wrapper flex flex-col items-center">
                     {userName && (
-                      <div className="userName mb-2 text-sm uppercase">
+                      <div className="userName mb-2 text-sm uppercase text-dark">
                         Hi, {userName}
                       </div>
                     )}
                     <button
-                      className="sign-in xs:px-3 mx-2 flex bg-white px-1 shadow-inner"
+                      className="sign-in xs:px-3 mx-2 flex bg-light px-1 text-dark shadow-inner"
                       onClick={handleLogOut}
                     >
                       Log&nbsp;Out
@@ -143,7 +143,7 @@ const NavBar = () => {
               ></div>
               <ul
                 className={
-                  "flex h-full w-full flex-col justify-evenly overflow-hidden bg-white bg-cover px-20 py-10 text-right lg:w-[56%] xl:w-5/12"
+                  "flex h-full w-full flex-col justify-evenly overflow-hidden bg-light bg-cover px-20 py-10 text-right lg:w-[56%] xl:w-5/12"
                 }
               >
                 <li className="xs:text-2xl pb-10 text-xl uppercase tracking-[.2rem] text-black lg:text-3xl">
@@ -154,7 +154,7 @@ const NavBar = () => {
                     <li onClick={handleDropDown}>
                       <Link
                         to="/ytso/login"
-                        className="sign-in mx-2 w-20 bg-white px-3 shadow-inner md:hidden"
+                        className="sign-in mx-2 w-20 bg-light px-3 text-dark shadow-inner md:hidden"
                       >
                         Sign In
                       </Link>
@@ -162,7 +162,7 @@ const NavBar = () => {
                     <li onClick={handleDropDown}>
                       <Link
                         to="/ytso/login?signup=true"
-                        className="sign-in mx-2 bg-white px-3 shadow-inner md:hidden"
+                        className="sign-in mx-2 bg-light px-3 text-dark shadow-inner md:hidden"
                       >
                         Sign Up
                       </Link>
@@ -171,7 +171,7 @@ const NavBar = () => {
                 )}
                 <li className="uppercase tracking-[.2rem]">
                   <Link
-                    to="/subs"
+                    to="/ytso/subs/"
                     className="xs:text-3xl text-2xl text-black hover:text-red-700 lg:text-4xl"
                     onClick={handleDropDown}
                   >
@@ -180,7 +180,7 @@ const NavBar = () => {
                 </li>
                 <li className="uppercase tracking-[.2rem]">
                   <Link
-                    to="/categories"
+                    to="/ytso/categories"
                     className="xs:text-3xl text-2xl text-black hover:text-red-700 lg:text-4xl"
                     onClick={handleDropDown}
                   >

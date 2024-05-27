@@ -7,6 +7,7 @@ import "./style.scss";
 import { RouterProvider } from "react-router-dom";
 import router from "./routes.tsx";
 import AuthContext from "./components/AuthContext/AuthContext.tsx";
+import SubsContext from "./components/SubsContext/index.ts";
 
 const queryClient = new QueryClient();
 
@@ -15,8 +16,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <QueryClientProvider client={queryClient}>
       <ThemeContext>
         <AuthContext>
-          <RouterProvider router={router} />
-          <ReactQueryDevtools />
+          <SubsContext>
+            <RouterProvider router={router} />
+            <ReactQueryDevtools />
+          </SubsContext>
         </AuthContext>
       </ThemeContext>
     </QueryClientProvider>

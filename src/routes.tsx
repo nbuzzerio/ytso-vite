@@ -4,6 +4,7 @@ import Homepage from "./pages/Homepage";
 import DetailPage from "./pages/DetailPage";
 import ErrorPage from "./pages/ErrorPage";
 import Login from "./pages/Login";
+import Subs from "./pages/Subs";
 
 const router = createBrowserRouter([
   {
@@ -13,6 +14,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <Homepage /> },
       { path: "/ytso/login", element: <Login /> },
+      { path: "/ytso/subs", element: <Subs /> },
       { path: "/ytso/:slug", element: <DetailPage /> },
     ],
   },
