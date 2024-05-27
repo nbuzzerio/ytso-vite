@@ -160,7 +160,7 @@ const LoginForm = () => {
         <input
           type="submit"
           value="submit"
-          className="my-5 bg-white p-3 hover:bg-gray-800 hover:text-white"
+          className="my-5 bg-white p-3 text-dark hover:bg-gray-800 hover:text-white"
         />
       </form>
       <div className="signup-wrapper flex justify-center">

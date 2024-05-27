@@ -89,13 +89,13 @@ const NavBar = () => {
                 <>
                   <Link
                     to="/ytso/login"
-                    className="sign-in mx-2 hidden bg-white px-3 shadow-inner md:flex"
+                    className="sign-in mx-2 hidden bg-white px-3 text-dark shadow-inner md:flex"
                   >
                     Sign In
                   </Link>
                   <Link
                     to="/ytso/login?signup=true"
-                    className="sign-in mx-2 hidden bg-white px-3 shadow-inner md:flex"
+                    className="sign-in mx-2 hidden bg-white px-3 text-dark shadow-inner md:flex"
                   >
                     Sign Up
                   </Link>

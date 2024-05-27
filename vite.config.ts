@@ -6,4 +6,13 @@ import { nodePolyfills } from "vite-plugin-node-polyfills";
 export default defineConfig({
   plugins: [react(), nodePolyfills()],
   base: "/ytso/",
+  server: {
+    proxy: {
+      "/ytso/api": {
+        target: "http://localhost:3000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/ytso\/api/, "/api"),
+      },
+    },
+  },
 });

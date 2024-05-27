@@ -93,7 +93,7 @@ const SubsList: React.FC<SubsListProps> = ({ category, setCategory }) => {
     .map((sub, i) => {
       return (
         <div
-          className={`sub-wrapper bg-gray group relative my-10 flex flex-col items-center gap-12 border border-black bg-white/50 p-5 drop-shadow-2xl transition duration-200 ${
+          className={`sub-wrapper bg-gray group relative my-10 flex flex-col items-center gap-12 border border-black bg-white p-5 text-dark/50 drop-shadow-2xl transition duration-200 ${
             deleteSubs || category
               ? "cursor-pointer  border-2 border-red-600 hover:bg-black hover:text-red-600"
               : ""
@@ -133,7 +133,9 @@ const SubsList: React.FC<SubsListProps> = ({ category, setCategory }) => {
       <div className="btn-wrapper flex w-full gap-10">
         <button
           className={`show-sub mx-auto w-8/12 rounded-2xl p-5 uppercase transition duration-1000 ${
-            showSubs ? "bg-white  text-red-600" : "bg-red-600  text-white"
+            showSubs
+              ? "bg-white text-dark  text-red-600"
+              : "bg-red-600  text-white"
           } ${subs.length > 0 ? "" : "hidden"}`}
           onClick={() => setShowSubs(!showSubs)}
         >

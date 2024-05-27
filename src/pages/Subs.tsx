@@ -35,7 +35,7 @@ export default function Subs() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!auth) navigate("/login");
+    if (!auth) navigate("/ytso/login");
 
     const lastChannelObserver = new IntersectionObserver((channels) => {
       const lastChannel = channels[0];
@@ -102,7 +102,7 @@ export default function Subs() {
   const searchSubsList = subsSearch.map((sub, i) => {
     return (
       <div
-        className={`searchSub-wrapper bg-gray group relative my-10 flex w-8/12 justify-start gap-12 border border-black bg-white/50 p-5 drop-shadow-2xl ${
+        className={`searchSub-wrapper bg-gray group relative my-10 flex w-8/12 justify-start gap-12 border border-black bg-white p-5 text-dark/50 drop-shadow-2xl ${
           subs.some(
             (existingSub) =>
               existingSub?.channelId === subsSearch[i]?.id?.channelId,
