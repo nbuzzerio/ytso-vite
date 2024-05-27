@@ -16,10 +16,6 @@ function SubsProvider({ children }: { children: React.ReactNode }) {
   const [subs, setSubs] = useState<any[]>([]);
   const auth = useAuth();
 
-  function handleSubs(subs: string[]) {
-    setSubs(subs);
-  }
-
   useEffect(() => {
     const controller = new AbortController();
     const signal = controller.signal;
@@ -34,7 +30,7 @@ function SubsProvider({ children }: { children: React.ReactNode }) {
         signal,
       })
         .then((res) => {
-          if (!res.ok) console.log("Respons status: ", res.status, res);
+          if (!res.ok) console.log("Response status: ", res.status, res);
           return res.json();
         })
         .then((data) => {
@@ -52,7 +48,7 @@ function SubsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <SubsContext.Provider value={subs}>
-      <SubsUpdateContext.Provider value={handleSubs}>
+      <SubsUpdateContext.Provider value={setSubs}>
         {children}
       </SubsUpdateContext.Provider>
     </SubsContext.Provider>

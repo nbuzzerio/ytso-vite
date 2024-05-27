@@ -7,7 +7,7 @@ import "./style.scss";
 import { RouterProvider } from "react-router-dom";
 import router from "./routes.tsx";
 import AuthContext from "./components/AuthContext/AuthContext.tsx";
-import SubsContext from "./components/SubsContext/index.ts";
+import SubsContext from "./components/SubsContext/SubsContext.tsx";
 
 const queryClient = new QueryClient();
 

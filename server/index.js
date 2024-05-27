@@ -29,13 +29,13 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from the 'dist' folder (one level up from the current directory)
 app.use(express.static(path.join(__dirname, "../dist")));
 
+routes(app);
+production(app);
+
 // Define a catch-all route to serve 'index.html'
 app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../dist", "index.html"));
 });
-
-routes(app);
-production(app);
 
 const listener = app.listen(process.env.PORT || 3000, (err) => {
   if (err) throw err;
