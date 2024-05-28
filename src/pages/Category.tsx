@@ -177,7 +177,7 @@ const Category: React.FC = () => {
     </div>
   ));
 
-  const handleOpenVid = (e: React.MouseEvent<HTMLImageElement>, i: number) => {
+  const handleOpenVid = (i: number) => {
     const imgWrapper = document.querySelector(`#thumbnail-wrapper-${i}`);
     imgWrapper?.classList.add("hidden");
 
@@ -226,19 +226,19 @@ const Category: React.FC = () => {
           src={video.snippet.thumbnails.default.url}
           alt=""
           className="h-full w-full cursor-pointer object-contain object-center sm:hidden md:object-cover"
-          onClick={(e) => handleOpenVid(e, i)}
+          onClick={() => handleOpenVid(i)}
         />
         <img
           src={video.snippet.thumbnails.medium.url}
           alt=""
           className="hidden h-full w-full cursor-pointer object-contain object-center sm:block md:object-cover lg:hidden"
-          onClick={(e) => handleOpenVid(e, i)}
+          onClick={() => handleOpenVid(i)}
         />
         <img
           src={video.snippet.thumbnails.high.url}
           alt=""
           className="hidden h-full w-full cursor-pointer object-contain object-center md:object-cover lg:block"
-          onClick={(e) => handleOpenVid(e, i)}
+          onClick={() => handleOpenVid(i)}
         />
       </div>
       <iframe
