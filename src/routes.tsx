@@ -1,11 +1,11 @@
 import { createBrowserRouter } from "react-router-dom";
 import Layout from "./pages/Layout";
 import Homepage from "./pages/Homepage";
-import DetailPage from "./pages/DetailPage";
 import ErrorPage from "./pages/ErrorPage";
 import Login from "./pages/Login";
 import Subs from "./pages/Subs";
 import Categories from "./pages/Categories";
+import Category from "./pages/Category";
 
 const router = createBrowserRouter([
   {
@@ -17,7 +17,7 @@ const router = createBrowserRouter([
       { path: "/ytso/login", element: <Login /> },
       { path: "/ytso/subs", element: <Subs /> },
       { path: "/ytso/categories", element: <Categories /> },
-      { path: "/ytso/:slug", element: <DetailPage /> },
+      { path: "/ytso/categories/:category", element: <Category /> },
     ],
   },
 ]);

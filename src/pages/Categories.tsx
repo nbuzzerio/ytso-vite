@@ -82,7 +82,7 @@ const Categories: React.FC = () => {
   const categoriesList = categories.map((category, i) => (
     <div
       key={i}
-      className={`categories-wrapper bg-gray group relative my-2 flex cursor-pointer flex-col items-center rounded-2xl border border-2 border-black bg-white p-5 text-dark/50 transition duration-200 ${
+      className={`categories-wrapper bg-gray group relative my-2 flex cursor-pointer flex-col items-center rounded-2xl border-2 border-black bg-light p-5 text-dark transition duration-200 ${
         deleteCategories
           ? "pointer-events-auto z-10 border-red-600 hover:bg-black hover:text-red-600"
           : ""
@@ -102,7 +102,7 @@ const Categories: React.FC = () => {
       <h2 className="sub-title text-red text-3xl">{category.categoryName}</h2>
       <Link
         to={{
-          pathname: `/categories/${category.categoryName.toLowerCase().replace(/ /g, "-")}`,
+          pathname: `/ytso/categories/${category.categoryName.toLowerCase().replace(/ /g, "-")}`,
           search: `?id=${category._id}`,
         }}
         className={`${
