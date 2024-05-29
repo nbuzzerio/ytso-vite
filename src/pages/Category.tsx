@@ -185,71 +185,77 @@ const Category: React.FC = () => {
     iframe?.classList.remove("hidden");
   };
 
-  const subFeedVidsList = subsFeed.map((video, i) => (
-    <div
-      className="video-wrapper flex max-h-screen w-full flex-col overflow-hidden md:w-10/12"
-      key={i}
-    >
-      <div className="video-header flex w-full justify-between">
-        <div className="video-titles-wrapper flex flex-col">
-          <a
-            href={`https://www.youtube.com/watch?v=${video.contentDetails.videoId}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <h3 className="video-title max-w-[25ch] overflow-hidden text-ellipsis whitespace-nowrap text-3xl text-dark hover:text-red-600 md:max-w-prose">
-              {video.snippet.title}
-            </h3>
-          </a>
-          <a
-            href={`https://www.youtube.com/c/${video.snippet.channelTitle}`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            <h4 className="video-channelTitle overflow-hidden text-ellipsis whitespace-nowrap text-2xl text-dark hover:text-red-600 md:max-w-prose">
-              {video.snippet.channelTitle}
-            </h4>
-          </a>
-        </div>
-        <time
-          dateTime={`${new Date(video.snippet.publishedAt).toLocaleDateString()}`}
-          className="video-date italics text-xl text-dark"
-        >
-          {new Date(video.snippet.publishedAt).toLocaleDateString()}
-        </time>
-      </div>
+  const subFeedVidsList = subsFeed
+    .sort(
+      (a: any, b: any) =>
+        new Date(b.snippet.publishedAt).valueOf() -
+        new Date(a.snippet.publishedAt).valueOf(),
+    )
+    .map((video, i) => (
       <div
-        className="aspect-video w-full overflow-hidden"
-        id={`thumbnail-wrapper-${i}`}
+        className="video-wrapper flex max-h-screen w-full flex-col overflow-hidden md:w-10/12"
+        key={i}
       >
-        <img
-          src={video.snippet.thumbnails.default.url}
-          alt=""
-          className="h-full w-full cursor-pointer object-contain object-center sm:hidden md:object-cover"
-          onClick={() => handleOpenVid(i)}
-        />
-        <img
-          src={video.snippet.thumbnails.medium.url}
-          alt=""
-          className="hidden h-full w-full cursor-pointer object-contain object-center sm:block md:object-cover lg:hidden"
-          onClick={() => handleOpenVid(i)}
-        />
-        <img
-          src={video.snippet.thumbnails.high.url}
-          alt=""
-          className="hidden h-full w-full cursor-pointer object-contain object-center md:object-cover lg:block"
-          onClick={() => handleOpenVid(i)}
-        />
+        <div className="video-header flex w-full flex-col justify-between sm:flex-row">
+          <div className="video-titles-wrapper flex flex-col">
+            <a
+              href={`https://www.youtube.com/watch?v=${video.contentDetails.videoId}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <h3 className="video-title max-w-[20ch] overflow-hidden text-ellipsis whitespace-nowrap text-3xl text-dark hover:text-wrap hover:text-red-600 sm:max-w-[25ch] md:max-w-prose">
+                {video.snippet.title}
+              </h3>
+            </a>
+            <a
+              href={`https://www.youtube.com/c/${video.snippet.channelTitle}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <h4 className="video-channelTitle overflow-hidden text-ellipsis whitespace-nowrap text-2xl text-dark hover:text-red-600 md:max-w-prose">
+                {video.snippet.channelTitle}
+              </h4>
+            </a>
+          </div>
+          <time
+            dateTime={`${new Date(video.snippet.publishedAt).toLocaleDateString()}`}
+            className="video-date italics text-xl text-dark"
+          >
+            {new Date(video.snippet.publishedAt).toLocaleDateString()}
+          </time>
+        </div>
+        <div
+          className="aspect-video w-full overflow-hidden"
+          id={`thumbnail-wrapper-${i}`}
+        >
+          <img
+            src={video.snippet.thumbnails.default.url}
+            alt=""
+            className="h-full w-full cursor-pointer object-contain object-center sm:hidden md:object-cover"
+            onClick={() => handleOpenVid(i)}
+          />
+          <img
+            src={video.snippet.thumbnails.medium.url}
+            alt=""
+            className="hidden h-full w-full cursor-pointer object-contain object-center sm:block md:object-cover lg:hidden"
+            onClick={() => handleOpenVid(i)}
+          />
+          <img
+            src={video.snippet.thumbnails.high.url}
+            alt=""
+            className="hidden h-full w-full cursor-pointer object-contain object-center md:object-cover lg:block"
+            onClick={() => handleOpenVid(i)}
+          />
+        </div>
+        <iframe
+          src={`https://www.youtube.com/embed/${video.contentDetails.videoId}`}
+          frameBorder="0"
+          allowFullScreen
+          className="hidden aspect-video h-full w-full"
+          id={`iframe-${i}`}
+        ></iframe>
       </div>
-      <iframe
-        src={`https://www.youtube.com/embed/${video.contentDetails.videoId}`}
-        frameBorder="0"
-        allowFullScreen
-        className="hidden aspect-video h-full w-full"
-        id={`iframe-${i}`}
-      ></iframe>
-    </div>
-  ));
+    ));
 
   return (
     <div className="bg-blue-200">

@@ -61,7 +61,7 @@ const NavBar = () => {
     <>
       <div className="navbar absolute z-50 flex h-[80px] w-full justify-center lg:h-[140px]">
         <nav
-          className={`wrapper max-w-bg absolute z-10 mx-auto flex h-[80px] w-full items-center justify-between bg-red-600 lg:h-[140px]`}
+          className={`wrapper max-w-bg absolute z-10 mx-auto flex h-[80px] w-full items-center justify-between overflow-hidden bg-red-600 lg:h-[140px]`}
         >
           <div className="logo-wrapper nav-item z-10 hidden px-10 lg:flex">
             <Link to="/ytso">
