@@ -191,6 +191,7 @@ const Category: React.FC = () => {
         new Date(b.snippet.publishedAt).valueOf() -
         new Date(a.snippet.publishedAt).valueOf(),
     )
+    .filter((video) => video)
     .map((video, i) => (
       <div
         className="video-wrapper flex max-h-screen w-full flex-col overflow-hidden md:w-10/12"
