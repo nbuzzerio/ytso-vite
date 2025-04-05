@@ -1,47 +1,93 @@
-# YouTube Subscription Organizer
+# 📺 YouTube Subscription Organizer (Vite Edition)
 
-## Description
+A modern, fast, and customizable YouTube Subscription Organizer built with **Vite**, **React**, and **TypeScript**. This app allows users to group and organize their YouTube channels into custom feeds, showing the latest videos by release date — completely independent of YouTube's default feed algorithm.
 
-Application that allows you to save youtube channels to category feeds. The feed will list the latest videos of each channel by release date. This is completely agnostic to youtube's feed algorithm and more customizable.
+---
 
-## Node Version
+## 🚀 Why This Project Matters
 
-This project is built and tested with Node.js version 18.19.0
+This project demonstrates how to build a performant front-end and API-backed subscription manager using a modern web stack. It emphasizes speed, modularity, and real-world data integration, while being flexible enough for future extensions.
 
-## Installation
+YouTube often curates content based on watch history and algorithmic trends. This tool gives control back to the user by letting them curate their own video feed using their personal categories.
 
-Run the following command to install dependencies:
+---
+
+## 🧠 Features
+
+- 📂 **Custom Feeds** – Group your favorite YouTube channels into personalized feeds
+- 🕓 **Latest Releases** – See the most recent videos from your subscriptions, sorted by publish date
+- 🔍 **Channel Search** – Search for YouTube channels and add them to your collections
+- ⚡ **Fast Frontend** – Built with Vite for near-instant dev refresh and optimized production builds
+- 🧼 **Clean Project Structure** – Easy to navigate and expand
+
+---
+
+## ⚙️ Tech Stack
+
+| Layer    | Tools                   |
+| -------- | ----------------------- |
+| Frontend | React, TypeScript, Vite |
+| Backend  | Node.js (API routing)   |
+| Styling  | SCSS, Tailwind CSS      |
+| API      | YouTube Data API        |
+| Tooling  | ESLint, Prettier, Husky |
+
+---
+
+## 📦 Installation
+
+> Requires **Node.js v18.19.0** or later
+
+1. Clone the repo:
+
+```bash
+git clone https://github.com/nbuzzerio/ytso-vite.git
+cd ytso-vite
+```
+
+2. Install dependencies:
 
 ```bash
 npm install
 ```
 
-## Usage
+3. Create a .env file in the root directory:
 
-To use the project, you will need an API key from RAWG.io. Place your API key in a `.env` file in the root directory:
-
-```
-API_KEY=[API KEY]
-API_URL=https://api.rawg.io/api
-PORT=[PORT NUMBER]
+```bash
+API_KEY=your_youtube_api_key
+API_URL=https://www.googleapis.com/youtube/v3
+PORT=3000
 ```
 
-Then, start the development server:
+4. Start the development server:
 
 ```bash
 npm run dev
 ```
 
-## Folder Structure
+## 📂 Project Structure
 
-The project's folder structure is as follows:
+```
+ytso-vite/
+├── public/              # Static assets
+├── server/              # Backend logic (API integration)
+├── src/
+│   ├── assets/          # Images, icons, fonts
+│   ├── components/      # Reusable UI components
+│   ├── hooks/           # Custom React hooks
+│   ├── services/        # YouTube API interaction logic
+│   └── App.tsx          # Root component
+├── example.env          # Environment variable template
+├── vite.config.ts       # Vite configuration
+└── tailwind.config.js   # Tailwind CSS configuration
 
-- `src`
-  - `assets`: Contains project assets such as images and fonts.
-  - `components`: Contains React components used in the project.
-  - `hooks`: Contains custom React hooks used in the project.
-  - `services`: Contains services for interacting with the RAWG.io API.
+```
 
-## License
+## 🧑‍💻 Developer Takeaways
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project demonstrates my ability to:
+
+- 🧩 Build fast, modular front-end apps using Vite and React
+- 🛡️ Work with environment-secured API access
+- 🧪 Manage and structure scalable codebases with TypeScript
+- 🧼 Apply clean formatting and pre-commit validation via Husky, Prettier, and ESLint
