@@ -28,6 +28,7 @@ YouTube often curates content based on watch history and algorithmic trends. Thi
 | -------- | ----------------------- |
 | Frontend | React, TypeScript, Vite |
 | Backend  | Node.js (API routing)   |
+| Database | MongoDB                 |
 | Styling  | SCSS, Tailwind CSS      |
 | API      | YouTube Data API        |
 | Tooling  | ESLint, Prettier, Husky |
