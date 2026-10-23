@@ -28,7 +28,11 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 async function until(predicate, label, timeout = 20_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    if (await predicate()) return;
+    try {
+      if (await predicate()) return;
+    } catch (error) {
+      throw new Error(`Wait failed: ${label}`, { cause: error });
+    }
     await delay(100);
   }
   throw new Error(`Timed out: ${label}`);
@@ -239,13 +243,14 @@ let origin;
 let launchError;
 let serverLog = "";
 let errorFeedbackBackground;
+let currentCheck;
 const interceptionErrors = [];
 
 async function waitText(text) {
   await until(
     () =>
       browser.evaluate(
-        `document.body.innerText.includes(${JSON.stringify(text)})`,
+        `document.body?.innerText.includes(${JSON.stringify(text)}) ?? false`,
       ),
     `text ${text}`,
   );
@@ -335,6 +340,7 @@ async function screenshot(name) {
   report.screenshots.push(filename);
 }
 async function check(label, action) {
+  currentCheck = label;
   await action();
   report.checks.push(label);
   console.log(`PASS ${label}`);
@@ -513,13 +519,56 @@ try {
   });
 
   await check(
+    "Text waits handle a document before its body exists",
+    async () => {
+      assert.equal(
+        await browser.evaluate(
+          `document.open(); document.write('<!doctype html><html><head><title>Navigation fixture</title>'); document.body === null`,
+        ),
+        true,
+      );
+      await assert.rejects(
+        browser.evaluate("document.body.innerText.includes('Ready')"),
+        /Cannot read properties of null.*innerText/,
+      );
+      await Promise.all([
+        waitText("Ready"),
+        browser.evaluate(
+          `document.write('</head><body>Ready</body></html>'); document.close()`,
+        ),
+      ]);
+      await assert.rejects(
+        until(
+          () =>
+            browser.evaluate(
+              "document.querySelector('#missing')?.textContent === 'Ready'",
+            ),
+          "text in #missing",
+          1,
+        ),
+        /Timed out: text in #missing/,
+      );
+      await assert.rejects(
+        until(
+          () =>
+            browser.evaluate("throw new Error('Unexpected predicate error')"),
+          "broken predicate",
+        ),
+        (error) =>
+          error.message === "Wait failed: broken predicate" &&
+          /Unexpected predicate error/.test(error.cause.message),
+      );
+    },
+  );
+
+  await check(
     "Session restoration preserves a protected detail URL; partial feeds recover",
     async () => {
       await navigate("/");
       await until(
         () =>
           browser.evaluate(
-            "location.pathname.startsWith('/ytso') && document.body.innerText.includes('Browser Tester')",
+            "location.pathname.startsWith('/ytso') && (document.body?.innerText.includes('Browser Tester') ?? false)",
           ),
         "root redirect preserves scoped session cookie",
       );
@@ -858,20 +907,26 @@ try {
   report.status = "passed";
 } catch (error) {
   report.status = "failed";
+  report.failedCheck = currentCheck;
   report.error = error.stack;
+  report.cause = error.cause?.stack;
   report.serverLog = serverLog.slice(-5000);
   report.interceptionErrors = interceptionErrors;
   if (browser) {
     try {
       report.page = await browser.evaluate(
-        "({url:location.href,text:document.body.innerText})",
+        "({url:location.href,readyState:document.readyState,title:document.title,bodyPresent:!!document.body,text:document.body?.innerText,html:document.documentElement?.outerHTML})",
       );
+    } catch (diagnosticError) {
+      report.pageDiagnosticError = diagnosticError.message;
+    }
+    try {
       await screenshot("failure");
-    } catch {
-      /* Browser may not have started. */
+    } catch (diagnosticError) {
+      report.screenshotError = diagnosticError.message;
     }
   }
-  console.error(error.stack);
+  console.error(error);
   process.exitCode = 1;
 } finally {
   await writeFile(
