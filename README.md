@@ -85,6 +85,25 @@ Set `NODE_ENV=production` in the environment or `.env` before starting. Open `ht
 
 `npm run preview` previews the frontend build only; use Express for a complete production-like application.
 
+### Installable app (PWA)
+
+The production build generates `/ytso/manifest.webmanifest` and `/ytso/sw.js` using `vite-plugin-pwa` 2.x, whose peer dependencies include the installed Vite 7.x. The manifest uses `/ytso/` for its stable app ID, start URL, and scope. The 192px/512px PNGs and separate maskable icon in `public/icons/` reuse the existing filing-cabinet branding, with the dark theme's background. The maskable artwork is inset inside the central safe area. The original favicon is preserved.
+
+Install from the **HTTPS production URL ending in `/ytso/`**:
+
+- **Android (Chrome):** open the browser menu and choose **Install and create shortcut → Install** (older versions may say **Add to home screen**). Launch YTSO from its home-screen/app-drawer icon. See [Chrome's installation instructions](https://support.google.com/chrome/answer/9658361?hl=en&co=GENIE.Platform%3DAndroid).
+- **Desktop (Chrome or Edge):** use the address bar's install icon, or the browser menu's install-app action. Launch it from the installed app shortcut.
+
+Supported browsers open the installed app in a standalone window. Installation is browser-controlled; no custom install prompt is required. Service workers require HTTPS, except trusted local development origins such as `http://localhost`. A phone visiting a PC's plain HTTP LAN address is not a production PWA test. Normal `npm run dev` intentionally does **not** register a service worker; test a production build with Express or run the isolated PWA suite below.
+
+After one successful load and completed service-worker installation, the static interface and lazy-loaded application routes are available offline. Library contents, signing in/up, YouTube search, thumbnails, playback, and all saved changes require connectivity. Existing in-memory results may remain visible until the page closes; account data is never persisted by the PWA. An accessible offline notice and request errors explain unavailable data without showing an empty library or clearing a valid session. Offline writes fail immediately and are never queued for reconnection. There is no background sync, push, or offline write support.
+
+Only build-time public resources are precached. API/health requests and external YouTube resources have no service-worker cache handler; API fetches and API/health HTTP responses also use `no-store`. Navigation fallback is confined to `/ytso/` and excludes API, health, and file URLs. The worker and manifest revalidate over HTTP, while hashed assets retain immutable HTTP caching. Both preserved-prefix and stripped-prefix reverse proxies are supported without changing PM2 or the readiness endpoint. Reverse proxies must preserve these cache policies and serve the worker/manifest as files, not rewrite them to HTML.
+
+Updates are checked on launch, returning to a visible app, reconnecting, and hourly while open. A fully installed update displays **Refresh to update** and **Later**. No tab automatically reloads: accepting refresh reloads that tab, while other open tabs receive the same choice. Refresh is disabled during a library mutation and warns about unsaved form changes. A failed/incomplete installation leaves the working worker active. Each shell version has its own precache; older tabs can still load their original hashed chunks after another tab updates. Old caches are deleted once all open YTSO tabs report the current version, or a later version check finds the older tabs closed. Unknown/suspended tabs conservatively retain their cache. Browser storage eviction or clearing site data can remove offline availability; reconnect to restore it.
+
+Before a human-approved production release, manually verify installation and standalone launching on a real Android device and a desktop browser over the final HTTPS proxy. Check maskable-icon cropping, an offline relaunch after installation, and the update prompt across two open windows. The automated tests use isolated local production servers and fixtures; they do not deploy or validate live database access, YouTube playback, OS-level installation, or the actual droplet's proxy configuration.
+
 ## 🧪 Testing
 
 ```bash
@@ -92,11 +111,13 @@ npm run lint
 npm test
 npm run build
 npm run test:ui
+npm run test:pwa
 ```
 
 - **Lint** checks frontend TypeScript, backend JavaScript, and test scripts.
 - **Node tests** cover session parsing, authentication and ownership, category membership, pagination/provider errors, production routing, headers, and rate limiting using injected fixtures.
 - **Browser checks** launch a private Vite server and Chrome/Chromium, intercept API requests, and exercise desktop/mobile flows. Set `CHROME_PATH` if the browser is not found automatically. Set `QA_OUTPUT_DIR` to choose where screenshots and the report are saved; otherwise they go into a temporary directory.
+- **PWA checks** require `npm run build` first, then launch separate production Express servers and a clean Chrome profile. They verify the generated manifest/icons, both proxy path modes, registration/scope, offline deep links and failed writes, absence of API/health caching, failed update installation, explicit update consent, old-tab chunk retention, and cache cleanup. A second release is built only in a uniquely created temporary directory; normal dev-server browser checks remain separate. CI runs both browser suites before packaging and saves their diagnostics on failure.
 - Unit and browser tests do not require `.env`, MongoDB, or a YouTube key. Live provider playback, database connectivity, and deployment still need environment-specific verification.
 
 ## 📂 Project Structure
@@ -108,6 +129,7 @@ src/
     auth/               Session handling and protected routes
     channels/           Saved channels, search, cards, and query hooks
     categories/         Category management, membership, and feeds
+    pwa/                Service worker, offline notice, and update lifecycle
   lib/                  Typed API client and shared domain types
   shared/ui/            Loading, empty, error, and feedback components
   components/           Navigation

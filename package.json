@@ -13,6 +13,7 @@
     "lint": "eslint src server database tests vite.config.ts --ext js,mjs,ts,tsx --report-unused-disable-directives",
     "test": "node --test tests/*.test.*",
     "test:ui": "node tests/ui.browser.mjs",
+    "test:pwa": "node tests/pwa.browser.mjs",
     "preview": "vite preview",
     "start": "node server/index.js",
     "prepare": "husky install"
@@ -64,6 +65,10 @@
     "sass": "^1.106.1",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.2.2",
-    "vite": "^7.3.7"
+    "vite": "^7.3.7",
+    "vite-plugin-pwa": "^2.0.0",
+    "workbox-core": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1"
   }
 }

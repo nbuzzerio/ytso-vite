@@ -99,6 +99,15 @@
 }
 
 @layer components {
+  .pwa-status {
+    width: 100%;
+    max-width: 1200px;
+    padding: 0 20px;
+    margin: 0 auto;
+  }
+  .pwa-update {
+    flex-wrap: wrap;
+  }
   .app-shell {
     display: flex;
     flex-direction: column;

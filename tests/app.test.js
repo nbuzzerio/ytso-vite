@@ -18,6 +18,14 @@ async function fixture(t, options = {}) {
     path.join(directory, "assets", "app-test.js"),
     "console.log('asset');",
   );
+  await writeFile(
+    path.join(directory, "sw.js"),
+    "/* service worker fixture */",
+  );
+  await writeFile(
+    path.join(directory, "manifest.webmanifest"),
+    '{"name":"YTSO"}',
+  );
   const app = createApp({
     distDirectory: directory,
     environment: "production",
@@ -65,6 +73,35 @@ test("production API and SPA routes work with preserved and stripped prefixes", 
     assert.equal(response.status, 200);
     assert.match(response.headers.get("cache-control"), /immutable/);
     assert.match(await response.text(), /console.log/);
+  }
+});
+
+test("PWA files revalidate under preserved and stripped proxy paths; APIs are never HTTP-cached", async (t) => {
+  const router = express.Router();
+  router.get("/subs", (_req, res) =>
+    res.json([{ subName: "Private library" }]),
+  );
+  const request = await fixture(t, { apiRouter: router });
+  for (const prefix of ["/ytso", ""]) {
+    for (const [file, type] of [
+      ["sw.js", "application/javascript"],
+      ["manifest.webmanifest", "application/manifest+json"],
+    ]) {
+      const response = await request(`${prefix}/${file}`);
+      assert.equal(response.status, 200);
+      assert.match(
+        response.headers.get("content-type"),
+        new RegExp(type.replace("+", "\\+")),
+      );
+      assert.match(response.headers.get("cache-control"), /no-cache/);
+      assert.doesNotMatch(response.headers.get("cache-control"), /immutable/);
+      await response.text();
+    }
+    for (const endpoint of ["subs", "missing"]) {
+      const response = await request(`${prefix}/api/${endpoint}`);
+      assert.equal(response.headers.get("cache-control"), "no-store");
+      await response.text();
+    }
   }
 });
 

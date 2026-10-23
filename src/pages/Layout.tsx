@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { Outlet, useLocation, useNavigation } from "react-router-dom";
 import NavBar from "../components/NavBar";
+import PwaStatus from "../features/pwa/PwaStatus";
 
 export default function Layout() {
   const location = useLocation();
@@ -32,6 +33,7 @@ export default function Layout() {
         Skip to content
       </a>
       <NavBar />
+      <PwaStatus />
       {navigation.state === "loading" && (
         <div className="route-progress" role="status">
           Loading page…

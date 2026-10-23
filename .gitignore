@@ -27,3 +27,6 @@ dist-ssr
 .env
 
 notes.txt
+
+# Local development tools and generated reviews
+.dev/

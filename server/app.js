@@ -23,6 +23,10 @@ export function createApp({
   app.set("trust proxy", trustProxy);
   app.locals.logger = logger;
   production(app, { environment });
+  app.use(["/ytso/api", "/api"], (_req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    next();
+  });
   app.use(express.json({ limit: "100kb" }));
   app.use(express.urlencoded({ extended: false, limit: "100kb" }));
 
@@ -46,7 +50,13 @@ export function createApp({
   const assets = express.static(distDirectory, {
     index: false,
     setHeaders(res, filePath) {
-      if (filePath.includes(`${path.sep}assets${path.sep}`)) {
+      if (path.basename(filePath) === "sw.js") {
+        res.set("Content-Type", "application/javascript");
+        res.set("Cache-Control", "no-cache, max-age=0, must-revalidate");
+      } else if (filePath.endsWith(".webmanifest")) {
+        res.set("Content-Type", "application/manifest+json");
+        res.set("Cache-Control", "no-cache, max-age=0, must-revalidate");
+      } else if (filePath.includes(`${path.sep}assets${path.sep}`)) {
         res.set("Cache-Control", "public, max-age=31536000, immutable");
       }
     },

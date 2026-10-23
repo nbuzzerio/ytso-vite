@@ -6,6 +6,8 @@ import { ApiError } from "../lib/api";
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
+      // Attempt once and show the offline error instead of pausing indefinitely.
+      networkMode: "always",
       staleTime: 60_000,
       refetchOnWindowFocus: false,
       retry: (failureCount, error) =>
@@ -15,7 +17,8 @@ const queryClient = new QueryClient({
           error.status < 500
         ) && failureCount < 1,
     },
-    mutations: { retry: false },
+    // Never queue a write to run later when connectivity returns.
+    mutations: { retry: false, networkMode: "always" },
   },
 });
 

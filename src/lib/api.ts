@@ -20,10 +20,16 @@ export async function api<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { token, method = "GET", body, signal } = options;
+  if (!navigator.onLine)
+    throw new ApiError(
+      "You're offline. Reconnect to load your library, search YouTube, or save changes.",
+      0,
+    );
   let response: Response;
   try {
     response = await fetch(`${import.meta.env.BASE_URL}api${endpoint}`, {
       method,
+      cache: "no-store",
       headers: {
         Accept: "application/json",
         ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
