@@ -21,6 +21,8 @@ const report = {
   runtimeErrors: [],
   consoleErrors: [],
   requests: [],
+  clicks: [],
+  responses: [],
   cancelledRequests: 0,
 };
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -67,7 +69,7 @@ const fourth = channel(
   "A channel with a deliberately long descriptive title for narrow screen coverage",
 );
 const initialCategoryId = "507f1f77bcf86cd799439011";
-const state = {
+const initialState = {
   channels: [lab, maker],
   categories: [
     { _id: initialCategoryId, categoryName: "Learning", subs: [lab, maker] },
@@ -80,6 +82,12 @@ const state = {
   secondAccount: false,
   delayCategoryList: false,
   delayedLists: 0,
+};
+const state = structuredClone(initialState);
+const ideasCategory = {
+  _id: "507f1f77bcf86cd799439012",
+  categoryName: "Ideas & experiments",
+  subs: [],
 };
 function token(name = "Browser Tester") {
   return `eyJhbGciOiJIUzI1NiJ9.${Buffer.from(JSON.stringify({ _id: state.secondAccount ? "507f1f77bcf86cd799439099" : "507f1f77bcf86cd799439000", name, exp: Math.floor(Date.now() / 1000) + 3600 })).toString("base64url")}.test-signature`;
@@ -121,6 +129,7 @@ async function mockApi(request) {
   const endpoint = url.pathname.slice("/ytso/api".length);
   const body = request.postData ? JSON.parse(request.postData) : {};
   report.requests.push({
+    scenario: currentCheck,
     method: request.method,
     path: endpoint,
     query: url.search,
@@ -242,9 +251,9 @@ let browser;
 let origin;
 let launchError;
 let serverLog = "";
-let errorFeedbackBackground;
 let currentCheck;
 const interceptionErrors = [];
+const pendingFixtures = new Set();
 
 async function waitText(text) {
   await until(
@@ -265,24 +274,97 @@ async function heading(text) {
   );
 }
 async function navigate(route) {
-  await browser.send("Page.navigate", { url: `${origin}${route}` });
+  const result = await browser.send("Page.navigate", {
+    url: `${origin}${route}`,
+  });
+  assert.ok(!result.errorText, `Navigation to ${route}: ${result.errorText}`);
+}
+async function resetScenario({
+  route,
+  title,
+  mobile = false,
+  ...fixtures
+} = {}) {
+  await browser.send("Page.navigate", { url: "about:blank" });
+  await until(
+    () =>
+      browser.evaluate(
+        "location.href === 'about:blank' && document.readyState === 'complete'",
+      ),
+    "previous scenario unloaded",
+  );
+  await until(
+    () => pendingFixtures.size === 0,
+    "previous API fixtures settled",
+  );
+  Object.assign(
+    state,
+    structuredClone(initialState),
+    structuredClone(fixtures),
+  );
+  await browser.send("Network.clearBrowserCookies");
+  await browser.send("Network.setCookie", {
+    name: "x-auth-token",
+    value: token(),
+    url: `${origin}/ytso/`,
+    path: "/ytso",
+  });
+  await browser.send("Emulation.setDeviceMetricsOverride", {
+    width: mobile ? 375 : 1365,
+    height: mobile ? 900 : 1000,
+    deviceScaleFactor: 1,
+    mobile: false,
+  });
+  if (route) await navigate(route);
+  if (title) await heading(title);
 }
 async function click(selector) {
-  const point = await browser.evaluate(
-    `(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element || element.disabled) return null; element.scrollIntoView({block:'center'}); const rect = element.getBoundingClientRect(); return {x:rect.x + rect.width/2,y:rect.y + rect.height/2}; })()`,
-  );
+  let point;
+  await until(async () => {
+    point = await browser.evaluate(
+      `(async () => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element || element.disabled) return null;
+      element.scrollIntoView({block:'center',behavior:'instant'});
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const before = JSON.stringify(Array.from(element.getClientRects(), rect => rect.toJSON()));
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      const stable = before === JSON.stringify(Array.from(element.getClientRects(), rect => rect.toJSON()));
+      const rects = Array.from(element.getClientRects(), rect => ({
+        left: Math.max(0,rect.left), top: Math.max(0,rect.top),
+        right: Math.min(innerWidth,rect.right), bottom: Math.min(innerHeight,rect.bottom),
+      })).filter(rect => rect.right > rect.left && rect.bottom > rect.top);
+      const candidates = rects.map(rect => {
+        const pointX = (rect.left+rect.right)/2, pointY = (rect.top+rect.bottom)/2;
+        const hit = document.elementFromPoint(pointX,pointY);
+        return {x:pointX,y:pointY,targetHit:!!hit && element.contains(hit),hit:hit?.outerHTML.slice(0,500)};
+      });
+      return {text:element.textContent,href:element.getAttribute('href'),rects,stable,
+        ...(candidates.find(candidate => candidate.targetHit) || candidates[0])};
+    })()`,
+    );
+    report.lastClick = { scenario: currentCheck, selector, ...point };
+    return point?.stable && point.targetHit;
+  }, `enabled, stable click target ${selector}`);
+  report.clicks.push({ scenario: currentCheck, selector, ...point });
   assert.ok(point, `Enabled clickable element exists: ${selector}`);
+  assert.ok(
+    point.targetHit,
+    `Click must hit ${selector}: ${JSON.stringify(point)}`,
+  );
   await browser.send("Input.dispatchMouseEvent", {
     type: "mousePressed",
     button: "left",
     clickCount: 1,
-    ...point,
+    x: point.x,
+    y: point.y,
   });
   await browser.send("Input.dispatchMouseEvent", {
     type: "mouseReleased",
     button: "left",
     clickCount: 1,
-    ...point,
+    x: point.x,
+    y: point.y,
   });
 }
 async function clickText(text, scope = "document") {
@@ -449,10 +531,17 @@ try {
     if (canceled) report.cancelledRequests++;
   });
   browser.on("Fetch.requestPaused", async ({ requestId, request }) => {
+    pendingFixtures.add(requestId);
     try {
       const url = new URL(request.url);
       if (url.origin === origin && url.pathname.startsWith("/ytso/api/")) {
         const response = await mockApi(request);
+        report.responses.push({
+          scenario: currentCheck,
+          url: request.url,
+          method: request.method,
+          ...structuredClone(response),
+        });
         await browser.send("Fetch.fulfillRequest", {
           requestId,
           responseCode: response.status,
@@ -492,7 +581,11 @@ try {
           error.message,
         )
       )
-        interceptionErrors.push(error.message);
+        interceptionErrors.push(
+          `${request.method} ${request.url}: ${error.message}`,
+        );
+    } finally {
+      pendingFixtures.delete(requestId);
     }
   });
   await Promise.all([
@@ -561,9 +654,30 @@ try {
     },
   );
 
+  await check("Pointer clicks hit a wrapped inline link", async () => {
+    await resetScenario();
+    await until(
+      () => browser.evaluate("!!document.body"),
+      "wrapped-link fixture body",
+    );
+    await browser.evaluate(
+      `document.body.innerHTML = '<div style="width:160px;font:20px/40px sans-serif"><a id="wrapped-link" href="#wrapped">Ideas &amp;<br>experiments</a></div>'; document.querySelector('a').onclick = event => { event.preventDefault(); window.__qaWrappedClicked = true; }`,
+    );
+    assert.equal(
+      await browser.evaluate(
+        `(() => { const link = document.querySelector('#wrapped-link'); const rect = link.getBoundingClientRect(); return link.contains(document.elementFromPoint(rect.x + rect.width/2, rect.y + rect.height/2)); })()`,
+      ),
+      false,
+      "The old bounding-box center misses the wrapped link",
+    );
+    await click("#wrapped-link");
+    assert.equal(await browser.evaluate("window.__qaWrappedClicked"), true);
+  });
+
   await check(
     "Session restoration preserves a protected detail URL; partial feeds recover",
     async () => {
+      await resetScenario();
       await navigate("/");
       await until(
         () =>
@@ -579,7 +693,7 @@ try {
         `/ytso/categories/${initialCategoryId}`,
       );
       await waitText("Couldn’t load Maker Workshop");
-      errorFeedbackBackground = await browser.evaluate(
+      const errorFeedbackBackground = await browser.evaluate(
         "getComputedStyle(document.querySelector('.feedback-error')).backgroundColor",
       );
       assert.ok(
@@ -626,16 +740,26 @@ try {
   await check(
     "Leaving a loading feed aborts requests without unhandled errors",
     async () => {
+      await resetScenario({
+        route: `/ytso/categories/${initialCategoryId}`,
+        title: "Learning",
+        feedFailure: false,
+      });
+      await waitText("Maker Workshop: a new idea");
+      const cancelledBefore = report.cancelledRequests;
       state.delayFeed = true;
       await clickText("Refresh feed");
       await until(() => state.delayedRequests > 0, "delayed feed request");
       await click('nav[aria-label="Main navigation"] a[href="/ytso/channels"]');
       await heading("Channels");
       await waitText("Saved channels (2)");
-      await delay(1700);
+      await until(
+        () => pendingFixtures.size === 0,
+        "delayed feed fixtures settled",
+      );
       state.delayFeed = false;
       assert.ok(
-        report.cancelledRequests > 0,
+        report.cancelledRequests > cancelledBefore,
         "Network observed canceled feed requests",
       );
     },
@@ -644,6 +768,18 @@ try {
   await check(
     "Enter submits an encoded search; pagination deduplicates and stops",
     async () => {
+      await resetScenario({
+        route: "/ytso/channels",
+        title: "Channels",
+        failChannels: true,
+      });
+      await waitText("Saved channels are temporarily unavailable.");
+      const errorFeedbackBackground = await browser.evaluate(
+        "getComputedStyle(document.querySelector('.feedback-error')).backgroundColor",
+      );
+      state.failChannels = false;
+      await clickText("Try again");
+      await waitText("Saved channels (2)");
       const query = "science & music/日本語";
       await type("#youtube-search", query);
       await key("Enter");
@@ -652,7 +788,8 @@ try {
       await waitText(`3 results for “${query}”`);
       await waitText("You’ve reached the end of these results.");
       const searches = report.requests.filter(
-        (request) => request.path === "/search",
+        (request) =>
+          request.path === "/search" && request.scenario === currentCheck,
       );
       assert.equal(searches.length, 2);
       assert.equal(new URLSearchParams(searches[0].query).get("q"), query);
@@ -701,10 +838,16 @@ try {
     },
   );
 
-  let createdId;
   await check(
     "Category writes cancel stale list reads, lock conflicting actions, and support Enter/rename",
     async () => {
+      await resetScenario({
+        route: "/ytso/",
+        title: "Your library",
+        mobile: true,
+        channels: [lab, maker, music],
+      });
+      await waitText("Learning");
       state.delayCategoryList = true;
       await browser.evaluate("window.__qaClockOffset += 61_000");
       await click(
@@ -738,9 +881,12 @@ try {
         "Creation is locked during writes",
       );
       await waitText("“New category” created.");
-      await delay(1700);
+      await until(
+        () => pendingFixtures.size === 0,
+        "stale category list fixture settled",
+      );
       await waitText("Your categories (2)");
-      createdId = state.categories.find(
+      const createdId = state.categories.find(
         (category) => category.categoryName === "New category",
       )._id;
       await click('button[aria-label="Rename New category"]');
@@ -765,7 +911,24 @@ try {
   await check(
     "Category membership adds, removes, and restores with real Undo",
     async () => {
+      await resetScenario({
+        route: "/ytso/categories",
+        title: "Categories",
+        mobile: true,
+        feedFailure: false,
+        channels: [lab, maker, music],
+        categories: [...initialState.categories, ideasCategory],
+      });
+      await waitText("Your categories (2)");
+      const createdId = ideasCategory._id;
       await clickText("Ideas & experiments");
+      await until(
+        () =>
+          browser.evaluate(
+            `location.pathname === '/ytso/categories/${createdId}'`,
+          ),
+        "category title link navigates to its detail URL",
+      );
       await heading("Ideas & experiments");
       await clickText("Add channels");
       await waitText("Add saved channels");
@@ -806,6 +969,17 @@ try {
   await check(
     "Category and saved-channel deletion require explicit confirmation",
     async () => {
+      await resetScenario({
+        route: `/ytso/categories/${ideasCategory._id}`,
+        title: ideasCategory.categoryName,
+        mobile: true,
+        feedFailure: false,
+        channels: [lab, maker, music],
+        categories: [
+          ...initialState.categories,
+          { ...ideasCategory, subs: [music] },
+        ],
+      });
       await clickText("← All categories");
       await heading("Categories");
       await click('button[aria-label="Delete Ideas & experiments"]');
@@ -838,9 +1012,12 @@ try {
   await check(
     "Saved-channel request errors show a working retry action",
     async () => {
-      state.failChannels = true;
-      await navigate("/ytso/channels");
-      await heading("Channels");
+      await resetScenario({
+        route: "/ytso/channels",
+        title: "Channels",
+        mobile: true,
+        failChannels: true,
+      });
       await waitText("Saved channels are temporarily unavailable.");
       state.failChannels = false;
       await clickText("Try again");
@@ -852,6 +1029,12 @@ try {
   await check(
     "Sign out clears the session; keyboard sign in restores the requested route without old account data",
     async () => {
+      await resetScenario({
+        route: "/ytso/channels",
+        title: "Channels",
+        mobile: true,
+      });
+      await waitText("Saved channels (2)");
       await clickText("Sign out");
       await waitText("Good channels.");
       assert.ok(
