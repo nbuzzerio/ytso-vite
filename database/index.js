@@ -1,14 +1,7 @@
 import mongoose from "mongoose";
 
-const db =
-  process.env.NODE_ENV === "test" ? process.env.testdb : process.env.db;
-
-export default function (logger) {
+export default async function initDatabase(logger, databaseUri) {
   mongoose.set("strictQuery", false);
-  mongoose
-    .connect(db, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-    })
-    .then(() => logger.info("Connected to MongoDB..."));
+  await mongoose.connect(databaseUri, { serverSelectionTimeoutMS: 10_000 });
+  logger.info("Connected to MongoDB.");
 }

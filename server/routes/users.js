@@ -1,50 +1,49 @@
-import bcrypt from "bcrypt";
+﻿import bcrypt from "bcrypt";
 import { User, validate } from "../../database/models/users.js";
-import mongoose from "mongoose";
 import express from "express";
 import auth from "../middleware/auth.js";
+import asyncMiddleware from "../middleware/async.js";
+import { HttpError } from "../validation/request.js";
+import { findUserByEmail, loadUser } from "../services/user-library.js";
 
-const router = express.Router();
+export function createUsersRouter(UserModel = User) {
+  const router = express.Router();
 
-router.get("/me", auth, async (req, res) => {
-  const user = await User.findById(req.user._id).select("name");
+  router.get(
+    "/me",
+    auth,
+    asyncMiddleware(async (req, res) => {
+      const user = await loadUser(UserModel, req.user._id);
+      res.json({ _id: user._id, name: user.name });
+    }),
+  );
 
-  res.send(user);
-});
+  router.post(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const { error, value } = validate(req.body);
+      if (error) throw new HttpError(400, error.details[0].message);
+      if (await findUserByEmail(UserModel, value.email)) {
+        throw new HttpError(409, "An account with this email already exists.");
+      }
 
-router.post("/", async (req, res) => {
-  const { error } = validate(req.body);
-  if (error) return res.status(400).send({ error: error.details[0].message });
+      const user = new UserModel({
+        name: value.name,
+        email: value.email,
+        password: await bcrypt.hash(value.password, 10),
+      });
+      await user.save();
+      const token = user.generateAuthToken();
+      res.header("x-auth-token", token).json({
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        token,
+      });
+    }),
+  );
 
-  let user = await User.findOne({ email: req.body.email });
-  if (user) return res.status(400).send({ error: "User already registered." });
+  return router;
+}
 
-  const { name, email, password } = req.body;
-
-  user = new User({
-    name: name,
-    email: email,
-    password: password,
-  });
-
-  const salt = await bcrypt.genSalt(10);
-  user.password = await bcrypt.hash(password, salt);
-
-  const token = user.generateAuthToken();
-  try {
-    const result = await user.save();
-
-    res.header("x-auth-token", token).send({
-      _id: result._id,
-      name: result.name,
-      email: result.email,
-      token: token,
-    });
-  } catch (ex) {
-    for (let field in ex.errors) {
-      console.log(ex.errors[field].message);
-    }
-  }
-});
-
-export default router;
+export default createUsersRouter();

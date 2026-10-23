@@ -1,70 +1,155 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
 name: YouTube Subscription Organizer CI
 
 on:
   push:
     branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ytso-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-    runs-on: self-hosted
-
-    strategy:
-      matrix:
-        node-version: [18.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
+  verify:
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: "npm"
+          node-version: 24
+          cache: npm
+      - name: Install exact dependencies
+        run: npm ci
+        env:
+          HUSKY: "0"
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - name: Verify browser flows
+        run: npm run test:ui
+        env:
+          QA_OUTPUT_DIR: ${{ runner.temp }}/ytso-browser-qa
+      - name: Save browser diagnostics
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-diagnostics
+          path: ${{ runner.temp }}/ytso-browser-qa
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Package verified application
+        if: github.event_name != 'pull_request'
+        run: tar -czf ytso-release.tar.gz dist server database package.json package-lock.json
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: ytso-release
+          path: ytso-release.tar.gz
+          retention-days: 7
 
-      - name: Set env variables in .env
+  deploy:
+    needs: verify
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: self-hosted
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: ytso-release
+      - name: Prepare an isolated release
+        id: release
+        shell: bash
         run: |
-          echo "jwtPrivateKey=${{ secrets.jwtPrivateKey }}" >> .env 
-          echo "db=${{ secrets.db }}" >> .env
-          echo "testdb=${{ secrets.testdb }}" >> .env
-          echo "YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }}" >> .env
-          echo "PORT=${{ secrets.PORT }}" >> .env
-
-      # Check if pm2 process with name 'ytso' exists
-      - name: Check if pm2 process exists
-        id: pm2_check
+          set -euo pipefail
+          mkdir -p "$HOME/apps/ytso/releases"
+          release_dir="$(mktemp -d "$HOME/apps/ytso/releases/${GITHUB_SHA:0:12}-XXXXXX")"
+          tar -xzf "$GITHUB_WORKSPACE/ytso-release.tar.gz" -C "$release_dir"
+          printf 'directory=%s\n' "$release_dir" >> "$GITHUB_OUTPUT"
+      - name: Install release dependencies
+        working-directory: ${{ steps.release.outputs.directory }}
+        run: npm ci
+        env:
+          HUSKY: "0"
+      - name: Activate release and verify readiness
+        shell: bash
+        env:
+          YTSO_RELEASE_DIRECTORY: ${{ steps.release.outputs.directory }}
+          YTSO_RELEASE_ID: ${{ github.sha }}
+          jwtPrivateKey: ${{ secrets.jwtPrivateKey }}
+          db: ${{ secrets.db }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          PORT: ${{ secrets.PORT || '3000' }}
+          TRUST_PROXY_HOPS: ${{ vars.TRUST_PROXY_HOPS || '0' }}
         run: |
-          if pm2 describe ytso > /dev/null; then
-            echo "exists=true" >> $GITHUB_ENV
-          else
-            echo "exists=false" >> $GITHUB_ENV
+          set -euo pipefail
+          previous_state="$(pm2 jlist | node -e "let data = ''; process.stdin.on('data', chunk => data += chunk); process.stdin.on('end', () => { const app = JSON.parse(data).find(item => item.name === 'ytso'); const env = app?.pm2_env; process.stdout.write([env?.pm_cwd || '', env?.YTSO_RELEASE_ID || env?.env?.YTSO_RELEASE_ID || '', env?.PORT || env?.env?.PORT || '3000'].join('\n')); });")"
+          mapfile -t previous <<< "$previous_state"
+          previous_dir="${previous[0]:-}"
+          previous_release="${previous[1]:-}"
+          previous_port="${previous[2]:-3000}"
+          wait_for_release() {
+            local expected_release="$1"
+            local health_port="$2"
+            for attempt in $(seq 1 20); do
+              if curl --fail --silent --connect-timeout 2 --max-time 5 --max-filesize 65536 \
+                --header 'Accept: application/json' "http://127.0.0.1:${health_port}/health" \
+                | node -e "let data = ''; process.stdin.on('data', chunk => { data += chunk; if (data.length > 65536) process.exit(1); }); process.stdin.on('end', () => { try { const body = JSON.parse(data); const expected = process.argv[1]; const correctRelease = expected ? body.releaseId === expected : !body.releaseId; process.exit(body.status === 'ok' && correctRelease ? 0 : 1); } catch { process.exit(1); } });" "$expected_release"; then
+                return 0
+              fi
+              sleep 2
+            done
+            return 1
+          }
+          release_config="$YTSO_RELEASE_DIRECTORY/ecosystem.config.cjs"
+          cat > "$release_config" <<'CONFIG'
+          module.exports = {
+            apps: [{
+              name: "ytso",
+              script: "server/index.js",
+              cwd: process.env.YTSO_RELEASE_DIRECTORY,
+              wait_ready: true,
+              listen_timeout: 15000,
+              kill_timeout: 12000,
+              env: {
+                NODE_ENV: "production",
+                YTSO_RELEASE_ID: process.env.YTSO_RELEASE_ID,
+                jwtPrivateKey: process.env.jwtPrivateKey,
+                db: process.env.db,
+                YOUTUBE_API_KEY: process.env.YOUTUBE_API_KEY,
+                PORT: process.env.PORT,
+                TRUST_PROXY_HOPS: process.env.TRUST_PROXY_HOPS,
+              },
+            }],
+          };
+          CONFIG
+          if pm2 startOrReload "$release_config" --update-env; then
+            if wait_for_release "$YTSO_RELEASE_ID" "$PORT"; then
+              pm2 save
+              printf '%s\n' "Verified the expected release is ready."
+              exit 0
+            fi
           fi
-
-      # Stop pm2 process if it exist
-      - name: Stop pm2 process
-        if: env.exists == 'true'
-        run: pm2 stop ytso
-
-      # Install npm packages
-      - name: Install npm packages
-        run: npm i
-
-      # Run the build
-      - name: Build for production
-        run: npm run build --if-present
-
-      # Start pm2 process if it doesn't exist
-      - name: Start pm2 process
-        if: env.exists == 'false'
-        run: pm2 start npm --name ytso -- start
-
-      # Save pm2 process if it did not exist for system reboot
-      - name: Save pm2 process
-        if: env.exists == 'false'
-        run: pm2 save
-
-      # Restart pm2 process
-      - name: Restart pm2 process
-        run: pm2 restart ytso
+          printf '%s\n' "Release failed its readiness check."
+          if [ -n "$previous_dir" ] && [ -f "$previous_dir/server/index.js" ]; then
+            export YTSO_RELEASE_DIRECTORY="$previous_dir"
+            export YTSO_RELEASE_ID="$previous_release"
+            export PORT="$previous_port"
+            if pm2 startOrReload "$release_config" --update-env && wait_for_release "$previous_release" "$previous_port"; then
+              pm2 save
+              if [ -n "$previous_release" ]; then
+                printf '%s\n' "Verified the previous release is ready after rollback."
+              else
+                printf '%s\n' "The previous application reports ready; no prior release ID was available."
+              fi
+            else
+              printf '%s\n' "Rollback was attempted but readiness could not be verified. The saved PM2 state was not replaced; check the application manually."
+            fi
+          fi
+          exit 1

@@ -1,45 +1,54 @@
-import express from "express";
-import path, { dirname } from "path";
-import { fileURLToPath } from "url";
+import mongoose from "mongoose";
+import { createApp } from "./app.js";
 import config from "./startup/config.js";
 import logger from "./startup/logger.js";
 import initDatabase from "../database/index.js";
-import validation from "./startup/validation.js";
-import routes from "./startup/routes.js";
-import production from "./startup/production.js";
-import rateLimiter from "./startup/rateLimiter.js";
+import createApiRouter from "./startup/routes.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+async function start() {
+  const settings = config();
+  await initDatabase(logger, settings.databaseUri);
 
-config();
-initDatabase(logger);
-validation();
+  const app = createApp({
+    apiRouter: createApiRouter(),
+    environment: settings.environment,
+    readiness: () => mongoose.connection.readyState === 1,
+    releaseId: process.env.YTSO_RELEASE_ID || null,
+    logger,
+    trustProxy: settings.trustProxy,
+  });
+  const listener = app.listen(settings.port, () => {
+    logger.info(`Ready on port ${listener.address().port}`);
+    // PM2 can wait until the database and HTTP listener are ready.
+    if (process.send) process.send("ready");
+  });
+  listener.on("error", (error) => {
+    logger.error("HTTP server failed to start", { message: error.message });
+    process.exitCode = 1;
+    mongoose.disconnect();
+  });
 
-const dev = process.env.NODE_ENV !== "production";
-const app = express();
-
-if (!dev) {
-  rateLimiter(app);
+  let closing = false;
+  const shutdown = () => {
+    if (closing) return;
+    closing = true;
+    const timeout = setTimeout(() => process.exit(1), 10_000).unref();
+    listener.close(async () => {
+      await mongoose.disconnect();
+      clearTimeout(timeout);
+    });
+  };
+  process.once("SIGTERM", shutdown);
+  process.once("SIGINT", shutdown);
 }
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Serve static files from the 'dist' folder (one level up from the current directory)
-app.use(express.static(path.join(__dirname, "../dist")));
-
-routes(app);
-production(app);
-
-// Define a catch-all route to serve 'index.html'
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../dist", "index.html"));
+start().catch((error) => {
+  // Database errors can contain connection strings, so do not log their contents.
+  logger.error(
+    "Server startup failed. Check the server configuration and database availability.",
+    {
+      name: error.name,
+    },
+  );
+  process.exitCode = 1;
 });
-
-const listener = app.listen(process.env.PORT || 3000, (err) => {
-  if (err) throw err;
-  logger.info(`> Ready on http://localhost:${process.env.PORT || 3000}`);
-});
-
-export default listener;

@@ -1,68 +1,47 @@
-import express from "express";
-import mongoose from "mongoose";
+﻿import express from "express";
+import Joi from "joi";
 import auth from "../middleware/auth.js";
 import asyncMiddleware from "../middleware/async.js";
-import dotenv from "dotenv";
-import { google } from "googleapis";
+import { channelId, validateRequest } from "../validation/request.js";
+import { createYoutubeService } from "../services/youtube.js";
 
-dotenv.config();
+const pageToken = Joi.string()
+  .max(1024)
+  .pattern(/^[A-Za-z0-9_+=/-]+$/);
 
-const router = express.Router();
+export function createSearchRouter(provider = createYoutubeService()) {
+  const router = express.Router();
+  router.use(auth);
 
-router.get(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const youtube = google.youtube("v3");
+  router.get(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({
+          q: Joi.string().trim().min(1).max(200).required(),
+          nextPageToken: pageToken,
+        }),
+        req.query,
+      );
+      res.json(await provider.search(input.q, input.nextPageToken));
+    }),
+  );
 
-    youtube.search
-      .list({
-        auth: process.env.YOUTUBE_API_KEY,
-        part: "snippet",
-        q: req.query.q,
-        type: "channel",
-        pageToken: req.query.nextPageToken,
-      })
-      .then((response) => {
-        res.send({
-          items: response.data.items,
-          nextPageToken: response.data.nextPageToken,
-        });
-      })
-      .catch((err) => res.send(err));
-  }),
-);
+  router.get(
+    "/subVideos",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({
+          channelId: channelId.required(),
+          nextPageToken: pageToken,
+        }),
+        req.query,
+      );
+      res.json(await provider.videos(input.channelId, input.nextPageToken));
+    }),
+  );
 
-router.get(
-  "/subVideos",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const youtube = google.youtube("v3");
+  return router;
+}
 
-    youtube.channels
-      .list({
-        auth: process.env.YOUTUBE_API_KEY,
-        id: req.query.channelId,
-        part: "contentDetails",
-        maxResults: 10,
-        pageToken: req.query.nextPageToken,
-      })
-      .then((response) => {
-        youtube.playlistItems
-          .list({
-            auth: process.env.YOUTUBE_API_KEY,
-            playlistId:
-              response.data.items[0].contentDetails.relatedPlaylists.uploads,
-            part: "snippet, contentDetails",
-            maxResults: 10,
-          })
-          .then((response) => {
-            res.send(response.data);
-          })
-          .catch((err) => res.send(err));
-      })
-      .catch((err) => res.send(err));
-  }),
-);
-
-export default router;
+export default createSearchRouter();

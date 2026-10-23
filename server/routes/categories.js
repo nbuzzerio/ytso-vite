@@ -1,154 +1,184 @@
-import express from "express";
-import mongoose from "mongoose";
-import { User, validate } from "../../database/models/users.js";
+﻿import express from "express";
+import Joi from "joi";
+import { User } from "../../database/models/users.js";
 import auth from "../middleware/auth.js";
 import asyncMiddleware from "../middleware/async.js";
-import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
+import {
+  categoryName,
+  channelId,
+  objectId,
+  validateRequest,
+  findCategory,
+  HttpError,
+} from "../validation/request.js";
+import { loadUser, updateLibrary } from "../services/user-library.js";
+import {
+  serializeCategories,
+  serializeCategory,
+  serializeChannels,
+} from "../services/library-response.js";
 
-dotenv.config();
+function assertUniqueName(user, name, excludedId) {
+  if (
+    user.categories.some(
+      (category) =>
+        String(category._id) !== excludedId &&
+        typeof category.categoryName === "string" &&
+        category.categoryName.trim().toLowerCase() === name.toLowerCase(),
+    )
+  ) {
+    throw new HttpError(409, "A category with this name already exists.");
+  }
+}
 
-const router = express.Router();
+export function createCategoriesRouter(UserModel = User) {
+  const router = express.Router();
+  router.use(auth);
 
-router.get(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
+  router.get(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const user = await loadUser(UserModel, req.user._id);
+      res.json(serializeCategories(user.categories));
+    }),
+  );
 
-    try {
-      const { categories } = await User.findById(decoded._id).select(
-        "categories",
+  router.get(
+    "/subs",
+    asyncMiddleware(async (req, res) => {
+      const { id } = validateRequest(
+        Joi.object({ id: objectId.required() }),
+        req.query,
       );
-      res.send(categories);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
+      const user = await loadUser(UserModel, req.user._id);
+      res.json(serializeCategory(findCategory(user, id)));
+    }),
+  );
 
-router.get(
-  "/subs",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const { categories } = await User.findById(decoded._id).select(
-        "categories",
+  router.post(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({ category: categoryName.required() }),
+        req.body,
       );
-      const category = categories.filter((category) =>
-        category._id.equals(req.query.id),
+      const categories = await updateLibrary(
+        UserModel,
+        req.user._id,
+        (user) => {
+          assertUniqueName(user, input.category);
+          user.categories.push({ categoryName: input.category, subs: [] });
+          return user.categories;
+        },
       );
+      res.json(serializeCategories(categories));
+    }),
+  );
 
-      res.send(category[0]);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.post(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const user = await User.findById(decoded._id);
-      user.categories.push({
-        categoryName: req.body.category,
-        subs: [],
+  router.patch(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({
+          categoryId: objectId.required(),
+          categoryName: categoryName.required(),
+        }),
+        req.body,
+      );
+      const category = await updateLibrary(UserModel, req.user._id, (user) => {
+        const category = findCategory(user, input.categoryId);
+        assertUniqueName(user, input.categoryName, input.categoryId);
+        category.categoryName = input.categoryName;
+        return category;
       });
-      await user.save();
+      res.json(serializeCategory(category));
+    }),
+  );
 
-      res.send(user.categories);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.put(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const user = await User.findById(decoded._id);
-
-      const category = user.categories.filter((category) =>
-        category._id.equals(req.body.categoryId),
+  router.put(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({
+          categoryId: objectId.required(),
+          // Metadata from older clients is accepted, but the saved record is authoritative.
+          sub: Joi.object({ channelId: channelId.required() })
+            .unknown(true)
+            .required(),
+        }),
+        req.body,
       );
+      const category = await updateLibrary(UserModel, req.user._id, (user) => {
+        const category = findCategory(user, input.categoryId);
+        const savedChannel = user.subs.find(
+          (item) => item.channelId === input.sub.channelId,
+        );
+        if (!savedChannel)
+          throw new HttpError(
+            404,
+            "Save this channel before adding it to a category.",
+          );
+        if (
+          !category.subs.some(
+            (item) => item.channelId === savedChannel.channelId,
+          )
+        ) {
+          const record = savedChannel.toObject
+            ? savedChannel.toObject()
+            : { ...savedChannel };
+          delete record._id;
+          category.subs.push(record);
+        }
+        return category;
+      });
+      res.json(serializeCategory(category));
+    }),
+  );
 
-      category[0].subs.push(req.body.sub);
-      await user.save();
-
-      res.send(category[0]);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.delete(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const user = await User.findById(decoded._id);
-      user.categories = user.categories.filter(
-        (category) => category.categoryName !== req.body.categoryName,
+  router.delete(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({ categoryId: objectId.required() }),
+        req.body,
       );
-      await user.save();
-      res.send(user.categories);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.delete(
-  "/sub",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const user = await User.findById(decoded._id);
-      const category = user.categories.filter((category) =>
-        category._id.equals(req.body.categoryId),
+      const categories = await updateLibrary(
+        UserModel,
+        req.user._id,
+        (user) => {
+          // Repeating a delete is harmless, including after another tab already removed it.
+          user.categories = user.categories.filter(
+            (item) => String(item._id) !== input.categoryId,
+          );
+          return user.categories;
+        },
       );
-      category[0].subs = category[0].subs.filter(
-        (sub) => sub.channelId !== req.body.channelId,
-      );
-      await user.save();
-      res.send(category[0].subs);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
+      res.json(serializeCategories(categories));
+    }),
+  );
 
-export default router;
+  router.delete(
+    "/sub",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({
+          categoryId: objectId.required(),
+          channelId: channelId.required(),
+        }),
+        req.body,
+      );
+      const subs = await updateLibrary(UserModel, req.user._id, (user) => {
+        const category = findCategory(user, input.categoryId);
+        category.subs = category.subs.filter(
+          (item) => item.channelId !== input.channelId,
+        );
+        return category.subs;
+      });
+      res.json(serializeChannels(subs));
+    }),
+  );
+
+  return router;
+}
+
+export default createCategoriesRouter();

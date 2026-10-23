@@ -1,75 +1,63 @@
-import express from "express";
-import mongoose from "mongoose";
-import { User, validate } from "../../database/models/users.js";
+﻿import express from "express";
+import Joi from "joi";
+import { User } from "../../database/models/users.js";
 import auth from "../middleware/auth.js";
 import asyncMiddleware from "../middleware/async.js";
-import jwt from "jsonwebtoken";
-import dotenv from "dotenv";
+import { channel, channelId, validateRequest } from "../validation/request.js";
+import { loadUser, updateLibrary } from "../services/user-library.js";
+import { serializeChannels } from "../services/library-response.js";
 
-dotenv.config();
+export function createSubsRouter(UserModel = User) {
+  const router = express.Router();
+  router.use(auth);
 
-const router = express.Router();
+  router.get(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const user = await loadUser(UserModel, req.user._id);
+      res.json(serializeChannels(user.subs));
+    }),
+  );
 
-router.get(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
+  router.post(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const savedChannel = validateRequest(channel, req.body);
+      const subs = await updateLibrary(UserModel, req.user._id, (user) => {
+        if (
+          !user.subs.some((item) => item.channelId === savedChannel.channelId)
+        ) {
+          user.subs.push(savedChannel);
+        }
+        return user.subs;
+      });
+      res.json(serializeChannels(subs));
+    }),
+  );
 
-    try {
-      const { subs } = await User.findById(decoded._id).select("subs");
-      res.send(subs);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.post(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const user = await User.findById(decoded._id);
-      user.subs.push(req.body);
-      await user.save();
-
-      res.send(user.subs);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.delete(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const token = req.header("x-auth-token");
-    const decoded = jwt.verify(token, process.env.jwtPrivateKey);
-
-    try {
-      const user = await User.findById(decoded._id);
-      user.subs = user.subs.filter(
-        (sub) => sub.channelId !== req.body.channelId,
+  router.delete(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(
+        Joi.object({ channelId: channelId.required() }),
+        req.body,
       );
-      await user.save();
+      const subs = await updateLibrary(UserModel, req.user._id, (user) => {
+        user.subs = user.subs.filter(
+          (item) => item.channelId !== input.channelId,
+        );
+        for (const category of user.categories) {
+          category.subs = category.subs.filter(
+            (item) => item.channelId !== input.channelId,
+          );
+        }
+        return user.subs;
+      });
+      res.json(serializeChannels(subs));
+    }),
+  );
 
-      res.send(user.subs);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-      }
-    }
-  }),
-);
+  return router;
+}
 
-export default router;
+export default createSubsRouter();

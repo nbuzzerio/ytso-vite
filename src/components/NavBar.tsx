@@ -1,199 +1,48 @@
-import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
-import { useAuth, useUpdateAuth } from "./AuthContext/AuthContext";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useSession } from "../features/auth/auth-context";
 import logo from "../assets/favicon.ico";
-import jwt from "jsonwebtoken";
 
-const NavBar = () => {
-  const [dropDown, setDropDown] = useState(false);
-  const [loaded, setLoaded] = useState(false);
-  const [userName, setUserName] = useState("");
-  const auth = useAuth();
-  const setAuth = useUpdateAuth();
-  const location = useLocation();
-
-  const checkAuthToken = () => {
-    const cookies = document.cookie.split(";");
-    cookies.forEach((cookie) => {
-      if (cookie.includes("x-auth-token=")) {
-        const token = cookie.trim().slice(13);
-        setAuth(token);
-
-        if (token) {
-          const decoded = jwt.decode(token);
-          if (decoded && typeof decoded !== "string" && "name" in decoded) {
-            setUserName(decoded.name);
-          }
-        }
-      }
-    });
-  };
-
-  useEffect(() => {
-    checkAuthToken();
-
-    document
-      ?.querySelector(".menu-btn-wrapper")
-      ?.addEventListener("click", () => {
-        document?.querySelector(".menu-btn")?.classList.add("clicked");
-      });
-
-    if (dropDown && !loaded) setLoaded(true);
-  }, [dropDown, auth]);
-
-  const handleDropDown = () => {
-    if (!dropDown) {
-      document.body.style.height = "100vh";
-      document.body.style.width = "100%";
-    } else {
-      document?.querySelector(".menu-btn")?.classList.remove("clicked");
-    }
-
-    setDropDown(!dropDown);
-  };
-
-  const handleLogOut = () => {
-    document.cookie = "x-auth-token=";
-    setAuth("");
-  };
-
+export default function NavBar() {
+  const { token, name, update } = useSession();
+  const navigate = useNavigate();
   return (
-    <>
-      <div className="navbar absolute z-50 flex h-[80px] w-full justify-center lg:h-[140px]">
-        <nav
-          className={`wrapper max-w-bg absolute z-10 mx-auto flex h-[80px] w-full items-center justify-between overflow-hidden bg-red-600 lg:h-[140px]`}
-        >
-          <div className="logo-wrapper nav-item z-10 hidden px-10 lg:flex">
-            <Link to="/ytso">
-              <img
-                className="h-32 cursor-pointer px-2"
-                src={logo}
-                alt="logo image"
-              />
-            </Link>
-          </div>
-
-          <div className="home-wrapper flex justify-center px-5 sm:px-10 lg:absolute lg:w-full">
-            <Link
-              to="/ytso"
-              title="home"
-              className="text-logo whitespace-nowrap text-4xl font-extrabold uppercase text-white md:text-6xl lg:text-7xl"
-            >
-              Y T S O
-            </Link>
-          </div>
-
-          <div className="right-header-wrapper nav-item z-10 flex items-center px-10">
-            <div className="login-wrapper flex">
-              {!auth && location.pathname !== "/ytso/login" && (
-                <>
-                  <Link
-                    to="/ytso/login"
-                    className="sign-in mx-2 hidden bg-white px-3 text-dark shadow-inner md:flex"
-                  >
-                    Sign In
-                  </Link>
-                  <Link
-                    to="/ytso/login?signup=true"
-                    className="sign-in mx-2 hidden bg-white px-3 text-dark shadow-inner md:flex"
-                  >
-                    Sign Up
-                  </Link>
-                </>
-              )}
-              {auth && (
-                <>
-                  <div className="loggedIn-wrapper flex flex-col items-center">
-                    {userName && (
-                      <div className="userName mb-2 text-sm uppercase text-dark">
-                        Hi, {userName}
-                      </div>
-                    )}
-                    <button
-                      className="sign-in xs:px-3 mx-2 flex bg-light px-1 text-dark shadow-inner"
-                      onClick={handleLogOut}
-                    >
-                      Log&nbsp;Out
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-            <div
-              className="menu-btn-wrapper flex items-center"
-              onClick={handleDropDown}
-            >
-              <div className="hidden text-2xl uppercase tracking-[0.07rem] text-black sm:block lg:text-3xl"></div>
-              <div className="menu-btn flex w-[40px] cursor-pointer flex-col sm:w-[50px]">
-                <span className="line1 w-1/2"></span>
-                <span className="line2 w-full"></span>
-                <span className="line3 w-9/12"></span>
-              </div>
-            </div>
-          </div>
-          {loaded && (
-            <div
-              className={`dropdown-wrapper ${
-                dropDown ? "animate-open" : "animate-close"
-              } hd:right-[calc((100vw-1937px)/2)] fixed top-[80px] flex h-[calc(100vh-80px)] w-full justify-end lg:top-[140px] lg:h-[calc(100vh-140px)]`}
-            >
-              <div
-                className="dropdown-overlay w-0 lg:w-7/12"
-                onClick={handleDropDown}
-              ></div>
-              <ul
-                className={
-                  "flex h-full w-full flex-col justify-evenly overflow-hidden bg-light bg-cover px-20 py-10 text-right lg:w-[56%] xl:w-5/12"
-                }
-              >
-                <li className="xs:text-2xl pb-10 text-xl uppercase tracking-[.2rem] text-black lg:text-3xl">
-                  Menu
-                </li>
-                {!auth && location.pathname !== "/ytso/login" && (
-                  <>
-                    <li onClick={handleDropDown}>
-                      <Link
-                        to="/ytso/login"
-                        className="sign-in mx-2 w-20 bg-light px-3 text-dark shadow-inner md:hidden"
-                      >
-                        Sign In
-                      </Link>
-                    </li>
-                    <li onClick={handleDropDown}>
-                      <Link
-                        to="/ytso/login?signup=true"
-                        className="sign-in mx-2 bg-light px-3 text-dark shadow-inner md:hidden"
-                      >
-                        Sign Up
-                      </Link>
-                    </li>
-                  </>
-                )}
-                <li className="uppercase tracking-[.2rem]">
-                  <Link
-                    to="/ytso/subs/"
-                    className="xs:text-3xl text-2xl text-black hover:text-red-700 lg:text-4xl"
-                    onClick={handleDropDown}
-                  >
-                    Subs
-                  </Link>
-                </li>
-                <li className="uppercase tracking-[.2rem]">
-                  <Link
-                    to="/ytso/categories"
-                    className="xs:text-3xl text-2xl text-black hover:text-red-700 lg:text-4xl"
-                    onClick={handleDropDown}
-                  >
-                    Categories
-                  </Link>
-                </li>
-              </ul>
-            </div>
-          )}
+    <header className="site-header">
+      <div className="header-inner">
+        <Link className="brand" to="/ytso" aria-label="YTSO home">
+          <img src={logo} alt="" width="40" height="40" />
+          <span>
+            YTSO<span className="brand-caption">A place for your channels</span>
+          </span>
+        </Link>
+        <nav className="main-nav" aria-label="Main navigation">
+          <NavLink to="/ytso/channels">Channels</NavLink>
+          <NavLink to="/ytso/categories">Categories</NavLink>
         </nav>
+        <div className="account-nav">
+          {token ? (
+            <>
+              <span className="account-name" title={name}>
+                {name}
+              </span>
+              <button
+                className="btn btn-secondary"
+                type="button"
+                onClick={() => {
+                  // Leave the protected route before its session guard re-renders.
+                  navigate("/ytso", { replace: true, flushSync: true });
+                  update("");
+                }}
+              >
+                Sign out
+              </button>
+            </>
+          ) : (
+            <Link className="btn btn-secondary" to="/ytso/login">
+              Sign in
+            </Link>
+          )}
+        </div>
       </div>
-    </>
+    </header>
   );
-};
-
-export default NavBar;
+}

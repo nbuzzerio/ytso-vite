@@ -1,12 +1,25 @@
 import rateLimit from "express-rate-limit";
 
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per `window` (here, per 15 minutes)
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-});
-
-export default function (app) {
-  app.use(limiter);
+export default function rateLimiter(api) {
+  const authentication = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: {
+      error: "Too many sign-in attempts. Please try again in 15 minutes.",
+    },
+  });
+  const search = rateLimit({
+    windowMs: 60 * 1000,
+    limit: 120,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    message: {
+      error: "Too many channel requests. Please wait a minute and try again.",
+    },
+  });
+  api.post(["/auth", "/users"], authentication);
+  api.use("/search", search);
 }

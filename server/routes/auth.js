@@ -1,35 +1,30 @@
-import { User } from "../../database/models/users.js";
-import mongoose from "mongoose";
+﻿import { User } from "../../database/models/users.js";
 import express from "express";
 import Joi from "joi";
 import bcrypt from "bcrypt";
+import asyncMiddleware from "../middleware/async.js";
+import { HttpError, validateRequest } from "../validation/request.js";
+import { findUserForLogin } from "../services/user-library.js";
 
-const router = express.Router();
-
-router.post("/", async (req, res) => {
-  const { error } = validateUser(req.body);
-  if (error) return res.status(400).send({ error: error.details[0].message });
-
-  let user = await User.findOne({ email: req.body.email });
-  if (!user)
-    return res.status(400).send({ error: "Invalid email or password." });
-
-  const validPassword = await bcrypt.compare(req.body.password, user.password);
-  if (!validPassword)
-    return res.status(400).send({ error: "Invalid email or password." });
-
-  const token = user.generateAuthToken();
-
-  res.send({ token });
+const credentials = Joi.object({
+  email: Joi.string().trim().min(5).max(255).email().required(),
+  password: Joi.string().min(5).max(255).required(),
 });
 
-function validateUser(req) {
-  const schema = Joi.object({
-    email: Joi.string().min(5).max(225).required().email(),
-    password: Joi.string().min(5).max(255).required(),
-  });
-
-  return schema.validate(req);
+export function createAuthRouter(UserModel = User) {
+  const router = express.Router();
+  router.post(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      const input = validateRequest(credentials, req.body);
+      const user = await findUserForLogin(UserModel, input.email);
+      if (!user || !(await bcrypt.compare(input.password, user.password))) {
+        throw new HttpError(400, "Invalid email or password.");
+      }
+      res.json({ token: user.generateAuthToken() });
+    }),
+  );
+  return router;
 }
 
-export default router;
+export default createAuthRouter();

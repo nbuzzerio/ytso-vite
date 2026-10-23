@@ -1,156 +1,124 @@
-import express from "express";
-import mongoose from "mongoose";
+﻿import express from "express";
 import auth from "../middleware/auth.js";
 import asyncMiddleware from "../middleware/async.js";
-import crypto from "crypto";
-import {
-  Groups,
-  validate,
-  algorithm,
-  key,
-  iv,
-} from "../../database/models/groups.js";
+import jwt from "jsonwebtoken";
+import { Groups, validate } from "../../database/models/groups.js";
 import { User } from "../../database/models/users.js";
+import { HttpError, objectId, validateRequest } from "../validation/request.js";
+import { loadUser, updateLibrary } from "../services/user-library.js";
 
-const router = express.Router();
+export function createGroupsRouter({
+  UserModel = User,
+  GroupModel = Groups,
+} = {}) {
+  const router = express.Router();
+  router.use(auth);
 
-router.get(
-  "/invite/:id",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const group = await Groups.findById({ _id: req.params.id });
-    if (!group) return res.status(404).send({ error: "Group not found." });
-
-    const member = await User.findById({ _id: req.user._id });
-    if (!member) return res.status(400).send({ error: "User is not valid." });
-
-    const currentMems = group.members.filter((member) =>
-      member.member_id.equals(req.user._id),
-    );
-    if (currentMems.length === 0)
-      return res
-        .status(403)
-        .send({ error: "User must be a member to get an invite code." });
-
-    try {
-      const inviteKey = group.generateInviteKey();
-
-      res.send({ inviteKey });
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-        res.status(500).send(ex.errors[field].message);
+  function invite(temporary) {
+    return asyncMiddleware(async (req, res) => {
+      const id = validateRequest(objectId.required(), req.params.id);
+      await loadUser(UserModel, req.user._id);
+      const group = await GroupModel.findById(id);
+      if (!group) throw new HttpError(404, "Group not found.");
+      if (
+        !group.members.some(
+          (member) => String(member.member_id) === req.user._id,
+        )
+      ) {
+        throw new HttpError(
+          403,
+          "You must be a member to create an invitation.",
+        );
       }
-    }
-  }),
-);
+      res.json({ inviteKey: group.generateInviteKey(temporary) });
+    });
+  }
 
-router.get(
-  "/timed-invite/:id",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const group = await Groups.findById({ _id: req.params.id });
-    if (!group) return res.status(404).send({ error: "Group not found." });
+  router.get("/invite/:id", invite(false));
+  router.get("/timed-invite/:id", invite(true));
 
-    const member = await User.findById({ _id: req.user._id });
-    if (!member) return res.status(400).send({ error: "User is not valid." });
-
-    const currentMems = group.members.filter((member) =>
-      member.member_id.equals(req.user._id),
-    );
-    if (currentMems.length === 0)
-      return res
-        .status(403)
-        .send({ error: "User must be a member to get an invite code." });
-
-    try {
-      const inviteKey = group.generateInviteKey(true);
-
-      res.send({ inviteKey });
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-        res.status(500).send(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.post(
-  "/",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const { error } = validate(req.body);
-    if (error) return res.status(400).send({ error: error.details[0].message });
-
-    req.body.members = [
-      {
-        member_id: req.body.owner_id,
-        member_name: req.body.owner_name,
-        isAdmin: true,
-      },
-    ];
-
-    const group = new Groups(req.body);
-
-    try {
-      const owner = await User.findById({ _id: req.body.owner_id });
-      const result = await group.save();
-      owner.groups.push({ groupName: result.name, groupId: result._id });
-      owner.save();
-
-      res.send(result);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-        res.status(500).send(ex.errors[field].message);
-      }
-    }
-  }),
-);
-
-router.post(
-  "/join/:id",
-  auth,
-  asyncMiddleware(async (req, res) => {
-    const decipher = crypto.createDecipheriv(algorithm, key, iv);
-    const decrypted =
-      decipher.update(req.params.id, "hex", "utf8") + decipher.final("utf8");
-    const decryptedPayload = JSON.parse(decrypted);
-
-    const expiration = new Date(decryptedPayload.expiration);
-    if (expiration < new Date())
-      return res.status(403).send({ error: "Invite code has expired." });
-
-    const group = await Groups.findById({ _id: decryptedPayload.id });
-    if (!group) return res.status(404).send({ error: "Group not found." });
-
-    const newcomer = await User.findById({ _id: req.user._id });
-    if (!newcomer) return res.status(400).send({ error: "User is not valid." });
-
-    const currentMem = group.members.filter((member) =>
-      member.member_id.equals(req.user._id),
-    );
-    if (currentMem.length > 0)
-      return res.status(400).send({ error: "User is already a member." });
-
-    try {
-      group.members.push({
-        member_id: req.user._id,
-        member_name: req.user.name,
+  router.post(
+    "/",
+    asyncMiddleware(async (req, res) => {
+      // Owner and membership fields are never accepted from the client.
+      const { error, value } = validate(req.body);
+      if (error) throw new HttpError(400, error.details[0].message);
+      const owner = await loadUser(UserModel, req.user._id);
+      const group = new GroupModel({
+        name: value.name,
+        owner_id: owner._id,
+        owner_name: owner.name,
+        members: [
+          { member_id: owner._id, member_name: owner.name, isAdmin: true },
+        ],
       });
-      newcomer.groups.push({ groupName: group.name, groupId: group._id });
       await group.save();
-      await newcomer.save();
-
-      res.send(group);
-    } catch (ex) {
-      for (let field in ex.errors) {
-        console.log(ex.errors[field].message);
-        res.status(500).send(ex.errors[field].message);
+      try {
+        await updateLibrary(UserModel, req.user._id, (user) => {
+          user.groups.push({ groupName: group.name, groupId: group._id });
+        });
+      } catch (error) {
+        // Compensate when the account update fails without requiring a Mongo replica set.
+        await GroupModel.deleteOne({ _id: group._id }).catch(() => {});
+        throw error;
       }
-    }
-  }),
-);
+      res.json(group);
+    }),
+  );
 
-export default router;
+  router.post(
+    "/join/:id",
+    asyncMiddleware(async (req, res) => {
+      let invite;
+      try {
+        invite = jwt.verify(req.params.id, process.env.jwtPrivateKey, {
+          algorithms: ["HS256"],
+          audience: "ytso-group-invite",
+          issuer: "ytso",
+        });
+        if (!Number.isFinite(invite.exp)) throw new Error("Missing expiration");
+      } catch {
+        throw new HttpError(400, "This invitation is invalid or has expired.");
+      }
+      const id = validateRequest(objectId.required(), invite.groupId);
+      const newcomer = await loadUser(UserModel, req.user._id);
+      let group;
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        group = await GroupModel.findById(id);
+        if (!group) throw new HttpError(404, "Group not found.");
+        if (
+          group.members.some(
+            (member) => String(member.member_id) === req.user._id,
+          )
+        )
+          break;
+        group.members.push({
+          member_id: newcomer._id,
+          member_name: newcomer.name,
+          isAdmin: false,
+        });
+        try {
+          await group.save();
+          break;
+        } catch (error) {
+          if (error.name !== "VersionError" || attempt === 2) throw error;
+        }
+      }
+      // An already joined group is safe to retry and repairs a previously interrupted account update.
+      await updateLibrary(UserModel, req.user._id, (user) => {
+        if (
+          !user.groups.some(
+            (item) => String(item.groupId) === String(group._id),
+          )
+        ) {
+          user.groups.push({ groupName: group.name, groupId: group._id });
+        }
+      });
+      res.json(group);
+    }),
+  );
+
+  return router;
+}
+
+export default createGroupsRouter();

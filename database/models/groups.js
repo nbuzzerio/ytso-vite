@@ -1,50 +1,52 @@
-import Joi from "joi";
+﻿import Joi from "joi";
 import mongoose from "mongoose";
-import crypto from "crypto";
+import jwt from "jsonwebtoken";
 
-const key = crypto.randomBytes(32);
-const iv = crypto.randomBytes(16);
-const algorithm = "aes256";
-
-const groupsSchema = new mongoose.Schema({
-  name: { type: String, required: true, minlength: 5, maxlength: 50 },
-  owner_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  owner_name: { type: String, required: true },
-  members: [
-    {
-      member_id: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-      member_name: { type: String, required: true },
-      isAdmin: { type: Boolean },
+const groupsSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+      minlength: 3,
+      maxlength: 50,
     },
-  ],
-});
+    owner_id: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "YTSO-User",
+    },
+    owner_name: { type: String, required: true },
+    members: [
+      {
+        member_id: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "YTSO-User",
+        },
+        member_name: { type: String, required: true },
+        isAdmin: Boolean,
+      },
+    ],
+  },
+  { optimisticConcurrency: true },
+);
 
-groupsSchema.methods.generateInviteKey = function (temp) {
-  let timestamp = new Date();
-  let expiration = temp
-    ? new Date(timestamp.setMinutes(timestamp.getMinutes() + 30))
-    : new Date(3000, 0, 1);
-
-  const text = JSON.stringify({
-    id: this._id,
-    expiration,
+groupsSchema.methods.generateInviteKey = function (temporary = false) {
+  return jwt.sign({ groupId: String(this._id) }, process.env.jwtPrivateKey, {
+    algorithm: "HS256",
+    audience: "ytso-group-invite",
+    issuer: "ytso",
+    expiresIn: temporary ? "30m" : "7d",
   });
-  const cipher = crypto.createCipheriv(algorithm, key, iv);
-  const encrypted = cipher.update(text, "utf8", "hex") + cipher.final("hex");
-
-  return encrypted;
 };
 
 const Groups = mongoose.model("YTSO-groups", groupsSchema);
 
 function validate(groups) {
-  const schema = Joi.object({
-    owner_id: Joi.objectId().required(),
-    owner_name: Joi.string().min(3).max(50).required(),
-    name: Joi.string().min(3).max(50).required(),
-  });
-
-  return schema.validate(groups);
+  return Joi.object({
+    name: Joi.string().trim().min(3).max(50).required(),
+  })
+    .required()
+    .validate(groups);
 }
 
-export { Groups, validate, key, iv, algorithm };
+export { Groups, validate };
