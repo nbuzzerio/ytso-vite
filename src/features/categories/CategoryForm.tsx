@@ -72,7 +72,7 @@ export default function CategoryForm({
           aria-describedby={error ? `${id}-error` : undefined}
         />
         {error && (
-          <p id={`${id}-error`} className="text-sm text-red-700" role="alert">
+          <p id={`${id}-error`} className="field-error" role="alert">
             {error}
           </p>
         )}

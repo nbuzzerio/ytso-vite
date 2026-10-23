@@ -116,11 +116,7 @@ export default function ChannelSearch({
             </button>
           </div>
           {validation && (
-            <p
-              id="youtube-search-error"
-              className="text-sm text-red-700"
-              role="alert"
-            >
+            <p id="youtube-search-error" className="field-error" role="alert">
               {validation}
             </p>
           )}
